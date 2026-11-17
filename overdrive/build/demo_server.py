@@ -61,6 +61,19 @@ That "rumble" sound comes from the **cross-plane crankshaft**: the firing order 
 - I can show a cutaway picture of the crankshaft next if you want to see the inside"""
 
 
+DEMO_NOTES = {
+    "CLAUDE.md": "# Memory\n\n## Rules\n- Make games look realistic: real textures and sounds, never code-drawn art.\n"
+                 "- No emojis inside games.\n- Every game needs its own menu that fits that game.\n"
+                 "- Must run smooth on low-end graphics cards: add auto quality.\n\n## Now\n"
+                 "- Racing game: the engine sounds are next.\n- Space game: parked until the racing game is done.\n",
+    "me/about.md": "# About me\n\n## Me\nLikes realistic racing games and horror games. Plays on PC and in VR.\n\n"
+                   "## Friends\nSam: plays co-op racing on weekends.\n",
+    "notes/projects.md": "# Projects\n\n## RACING GAME\nRealistic street racer. Cars: 3 so far. Next: engine sounds "
+                         "from real recordings, then the night map.\n\n## SPACE GAME\nA small space shooter. Parked.\n",
+    "notes/talk-11-03.md": "## What we talked about\nThey want the racing game to feel heavy, like a real car.\n",
+}
+
+
 def script(req: dict, fake: FakeClaude):
     if "check other AI work" in system_text(req):
         return [X('{"status": "done", "reason": "The journal shows todo.txt was created with 3 items, matching the goal."}')]
@@ -70,6 +83,15 @@ def script(req: dict, fake: FakeClaude):
     i = turn_index(req)
     everything = json.dumps(req.get("messages", [])).lower()
     building = "MODE: BUILD" in system_text(req) or "mode: build" in everything
+    if "remember" in ask and not building:
+        # Piece 3: memory saves + tells you (Undo)
+        steps = [
+            [T("memory_remember", kind="fact", title="Likes realistic racing games",
+               content="Loves realistic racing games with real engine sounds and real-looking graphics.",
+               about_me=True, reason="They just told me")],
+            [X("Got it! I'll remember you love **realistic racing games** with real engine sounds.")],
+        ]
+        return steps[i] if i < len(steps) else [X("Done.")]
     if "engine" in ask and not building:
         # Chat mode, Piece 2: real pictures + a ChatGPT-style answer (lists, a table, its own ideas)
         steps = [
@@ -166,6 +188,13 @@ async def main() -> None:
         "CLAUDE_CODE_OAUTH_TOKEN": "", "ANTHROPIC_AUTH_TOKEN": ""})
     cli = "" if a.no_cli else (find_cli() or "")
     od.settings.update({"cli_path": cli or str(root / "missing-claude.exe")}, by="demo")
+    # Demo notes for the Memory page (made-up example notes, not anyone's real memory)
+    notes = root / "demo-notes"
+    for rel, text in DEMO_NOTES.items():
+        f = notes / rel
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(text, encoding="utf-8")
+    print(f"NOTES {notes}", flush=True)
     if a.no_cli:
         od.test_env = None  # show the real first-run screen
     selftest.CLI = cli or None

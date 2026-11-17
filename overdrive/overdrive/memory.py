@@ -174,6 +174,14 @@ CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(
     tokenize='unicode61'
 );
 
+-- Piece 3: where an imported row came from (so a re-import updates it instead of adding a copy)
+CREATE TABLE IF NOT EXISTS memory_sources (
+    key     TEXT PRIMARY KEY,      -- "<file>#<heading>#<n>"
+    row_id  TEXT NOT NULL,         -- "" = the human deleted it: a re-import never brings it back
+    sha     TEXT NOT NULL,
+    updated TEXT NOT NULL
+);
+
 CREATE TRIGGER IF NOT EXISTS memory_ai AFTER INSERT ON memory BEGIN
     INSERT INTO memory_fts(rowid, title, content, tags)
         VALUES (new.rowid, new.title, new.content, new.tags);
@@ -339,7 +347,103 @@ class Memory:
             self._conn.execute(
                 "UPDATE memory SET superseded_by = NULL WHERE superseded_by = ?", (row_id,),
             )
+            # An imported row the human deleted stays deleted on the next import.
+            self._conn.execute("UPDATE memory_sources SET row_id = '' WHERE row_id = ?", (row_id,))
         return row
+
+    # -------------------------------------------------- Piece 3: undo, pins, the memory page
+    def unarchive(self, row_id: str) -> Row:
+        """Undo an archive: the row is active again."""
+        row = self.get(row_id)
+        if row is None:
+            raise MemoryError(f"no memory with id {row_id!r}")
+        if row.status == _ARCHIVED:
+            with self._conn:
+                self._conn.execute("UPDATE memory SET status = ?, updated = ? WHERE id = ?",
+                                   (_ACTIVE, utc_now_iso(), row_id))
+        return self.get(row_id)  # type: ignore[return-value]
+
+    def revert_update(self, new_id: str) -> Row:
+        """Undo a memory_update: the new row goes away and the row it replaced is active again."""
+        new = self.get(new_id)
+        if new is None:
+            raise MemoryError(f"no memory with id {new_id!r}")
+        r = self._conn.execute("SELECT id FROM memory WHERE superseded_by = ?", (new_id,)).fetchone()
+        if r is None:
+            raise MemoryError("can't find the older row this one replaced")
+        if new.status != _ACTIVE:
+            raise MemoryError("this row was changed again after that, so it can't be undone from here")
+        with self._conn:
+            self._conn.execute("DELETE FROM memory WHERE id = ?", (new_id,))
+            self._conn.execute("UPDATE memory SET status = ?, superseded_by = NULL, updated = ? WHERE id = ?",
+                               (_ACTIVE, utc_now_iso(), r["id"]))
+            self._conn.execute("UPDATE memory_sources SET row_id = ? WHERE row_id = ?", (r["id"], new_id))
+        return self.get(r["id"])  # type: ignore[return-value]
+
+    def set_pinned(self, row_id: str, pinned: bool) -> Row:
+        """Pinned rows always go into OVERDRIVE's instructions first. A pin is not a content change, so it
+        doesn't make a new version of the row."""
+        row = self.get(row_id)
+        if row is None:
+            raise MemoryError(f"no memory with id {row_id!r}")
+        tags = [t for t in row.tags if t != "pinned"]
+        if pinned:
+            tags = ["pinned"] + tags[:MAX_TAGS - 1]
+        with self._conn:
+            self._conn.execute("UPDATE memory SET tags = ? WHERE id = ?", (json.dumps(tags, ensure_ascii=False), row_id))
+        return self.get(row_id)  # type: ignore[return-value]
+
+    def find_duplicate(self, kind: str, title: str, content: str) -> Row | None:
+        """An active row that already says the same thing (no duplicate spam)."""
+        def norm(x: str) -> str:
+            return " ".join(_WORD_RE.findall((x or "").lower()))
+        want_c, want_t = norm(content), norm(title)
+        rows = self._conn.execute("SELECT * FROM memory WHERE kind = ? AND status = ?", (kind, _ACTIVE)).fetchall()
+        for r in rows:
+            if norm(r["content"]) == want_c and (want_c or norm(r["title"]) == want_t):
+                return _row_from(r)
+        return None
+
+    def page(self, category: str = "all", query: str = "", status: str = _ACTIVE, limit: int = 100,
+             offset: int = 0) -> dict:
+        """What the Memory page shows: one category, a search, newest first, pinned on top."""
+        limit = max(1, min(int(limit), 300))
+        offset = max(0, int(offset))
+        if status not in STATUSES:
+            status = _ACTIVE
+        q = _fts_query(query)
+        if q:
+            sql = ("SELECT memory.* FROM memory_fts JOIN memory ON memory.rowid = memory_fts.rowid "
+                   "WHERE memory_fts MATCH ? AND memory.status = ? ORDER BY bm25(memory_fts) ASC LIMIT 1000")
+            rows = [_row_from(r) for r in self._conn.execute(sql, (q, status)).fetchall()]
+        else:
+            sql = "SELECT * FROM memory WHERE status = ? ORDER BY updated DESC, rowid DESC"
+            rows = [_row_from(r) for r in self._conn.execute(sql, (status,)).fetchall()]
+        if category != "all":
+            rows = [r for r in rows if category_of(r) == category]
+        if not q:
+            rows.sort(key=lambda r: 0 if "pinned" in r.tags else 1)   # stable: newest first inside each group
+        return {"total": len(rows), "rows": [dict(r.to_dict(), category=category_of(r)) for r in rows[offset:offset + limit]]}
+
+    def counts(self) -> dict:
+        out = {c: 0 for c in CATEGORIES}
+        for r in self._conn.execute("SELECT kind, tags FROM memory WHERE status = ?", (_ACTIVE,)).fetchall():
+            out[_category(r["kind"], json.loads(r["tags"] or "[]"))] += 1
+        out["all"] = sum(out[c] for c in CATEGORIES)
+        out["archived"] = self._conn.execute("SELECT COUNT(*) FROM memory WHERE status = ?",
+                                             (_ARCHIVED,)).fetchone()[0]
+        return out
+
+    # imported rows: where they came from
+    def source_get(self, key: str) -> tuple[str, str] | None:
+        r = self._conn.execute("SELECT row_id, sha FROM memory_sources WHERE key = ?", (key,)).fetchone()
+        return (r["row_id"], r["sha"]) if r else None
+
+    def source_put(self, key: str, row_id: str, sha: str) -> None:
+        with self._conn:
+            self._conn.execute("INSERT INTO memory_sources(key, row_id, sha, updated) VALUES (?,?,?,?) "
+                               "ON CONFLICT(key) DO UPDATE SET row_id = excluded.row_id, sha = excluded.sha, "
+                               "updated = excluded.updated", (key, row_id, sha, utc_now_iso()))
 
     def _insert(self, row: Row, commit: bool = True) -> None:
         sql = (
@@ -411,36 +515,57 @@ class Memory:
         return [_row_from(r) for r in rows]
 
     # -------------------------------------------------- boot digest
-    def digest(self, instruction_limit: int = 12, project_limit: int = 8,
-               relationship_limit: int = 8) -> str:
-        """A compact text block that boots OVERDRIVE with the active standing
-        orders, open projects and people it knows. Appended to the system
-        prompt. Content is plain text with markers; it is OVERDRIVE's own
-        trusted material, not outside data (rule 66: still built only from
-        OVERDRIVE's text + settings, never from tool output)."""
-        instructions = self.list(("instruction",), limit=instruction_limit)
-        projects = self.list(("project",), limit=project_limit)
-        relationships = self.list(("relationship",), limit=relationship_limit)
+    def digest(self, instruction_limit: int = 60, project_limit: int = 8,
+               relationship_limit: int = 8, budget_chars: int = 7000) -> str:
+        """A compact text block that boots OVERDRIVE with what matters most: pinned rows first, then the
+        human's rules (standing orders), open projects and people. Appended to the system prompt.
+        Content is plain text with markers; it is OVERDRIVE's own trusted material, not outside data
+        (rule 66: still built only from OVERDRIVE's text + settings, never from tool output).
+        Kept under budget_chars so a big imported memory can't flood every chat."""
+        pinned = [_row_from(r) for r in self._conn.execute(
+            "SELECT * FROM memory WHERE status = ? ORDER BY updated DESC, rowid DESC", (_ACTIVE,)).fetchall()]
+        pinned = [r for r in pinned if "pinned" in r.tags]
+        seen = {r.id for r in pinned}
+        instructions = [r for r in self.list(("instruction",), limit=instruction_limit) if r.id not in seen]
+        projects = [r for r in self.list(("project",), limit=project_limit) if r.id not in seen]
+        relationships = [r for r in self.list(("relationship",), limit=relationship_limit) if r.id not in seen]
 
-        if not (instructions or projects or relationships):
+        if not (pinned or instructions or projects or relationships):
             return ""
 
         parts = ["WHAT OVERDRIVE REMEMBERS (from your long-term memory):"]
+        used = len(parts[0])
+        left_out = 0
+
+        def add(line: str) -> bool:
+            nonlocal used, left_out
+            if used + len(line) + 1 > budget_chars:
+                left_out += 1
+                return False
+            parts.append(line)
+            used += len(line) + 1
+            return True
+
+        if pinned:
+            add("Pinned by the human (always keep these in mind):")
+            for r in pinned:
+                add(f"  - [{r.id}] ({r.kind}) {r.title}: {_summary(r.content, 240)}")
         if instructions:
-            parts.append("Standing orders from the human:")
+            add("Standing orders from the human:")
             for r in instructions:
-                parts.append(f"  - [{r.id}] {r.title}")
-                if r.content and r.content.strip() != r.title:
-                    parts.append(f"      {_summary(r.content)}")
+                body = _summary(r.content, 200) if r.content and r.content.strip() != r.title else ""
+                add(f"  - [{r.id}] {r.title}" + (f" ({body})" if body and body != r.title else ""))
         if projects:
-            parts.append("Open projects:")
+            add("Open projects:")
             for r in projects:
-                parts.append(f"  - [{r.id}] {r.title}: {_summary(r.content)}")
+                add(f"  - [{r.id}] {r.title}: {_summary(r.content)}")
         if relationships:
-            parts.append("People:")
+            add("People:")
             for r in relationships:
-                parts.append(f"  - [{r.id}] {r.title}: {_summary(r.content)}")
-        parts.append("Use the memory_recall tool to look up facts and experiences before guessing.")
+                add(f"  - [{r.id}] {r.title}: {_summary(r.content)}")
+        if left_out:
+            parts.append(f"({left_out} more rows didn't fit here; memory_recall finds them.)")
+        parts.append("Use the memory_recall tool to look up facts, projects and experiences before guessing.")
         return "\n".join(parts)
 
     # -------------------------------------------------- backup / restore
@@ -586,3 +711,25 @@ def _norm_related(related: Iterable[str] | None, conn: sqlite3.Connection | None
         if missing:
             raise MemoryError(f"these related ids don't exist: {missing}")
     return out
+
+
+# ---------------------------------------------------------------- Memory page categories (Piece 3)
+CATEGORIES = ("projects", "about", "rules", "people", "experiences", "facts")
+CATEGORY_NAMES = {"projects": "Projects", "about": "About me", "rules": "Rules", "people": "People",
+                  "experiences": "Experiences", "facts": "Facts"}
+
+
+def _category(kind: str, tags: list[str]) -> str:
+    if kind == "instruction":
+        return "rules"
+    if kind == "project":
+        return "projects"
+    if kind == "relationship":
+        return "people"
+    if kind == "experience":
+        return "experiences"
+    return "about" if "about-me" in tags else "facts"
+
+
+def category_of(row: Row) -> str:
+    return _category(row.kind, row.tags)

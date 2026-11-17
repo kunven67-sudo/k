@@ -325,5 +325,6 @@ def test_memory_tools_have_correct_risks():
     assert reg.get("memory_remember").risk == Risk.WRITE
     assert reg.get("memory_recall").risk == Risk.READ
     assert reg.get("memory_list").risk == Risk.READ
-    assert reg.get("memory_update").risk == Risk.DESTRUCTIVE
-    assert reg.get("memory_archive").risk == Risk.DESTRUCTIVE
+    # Piece 3: update/archive keep history and have Undo, so they're WRITE (personal rows still ask first)
+    assert reg.get("memory_update").risk == Risk.WRITE
+    assert reg.get("memory_archive").risk == Risk.WRITE

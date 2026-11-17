@@ -180,6 +180,7 @@ async function refreshState() {
   if (S.conv) await openConversation(S.conv, true); else renderFeed();
   updateRunning();
   renderNeeds();
+  P3.state(st);
 }
 
 /* ---------------------------------------------------------------- live events */
@@ -235,7 +236,7 @@ function handle(ev) {
     case "selftest": onTestProgress(ev.name, ev.result); break;
     case "selftest_done": onTestsDone(ev.summary); break;
     case "log": if (S.tab === "logs") debounceLogs(); break;
-    default: break;
+    default: P3.event(ev); break;
   }
 }
 
@@ -454,7 +455,7 @@ function turnNode(t) {
       ${t.final_text ? `<button class="ghost" data-copyall="${t.id}" title="Copy the whole answer">Copy</button>` : ""}<button class="ghost" data-details="${t.id}">Details</button><button class="ghost" data-rerun="${t.id}" title="Send the same message again">${t.status !== "done" ? "Try again" : "Ask again"}</button></div>`;
   const mine = t.request.startsWith("GO. I said Yes") ? "" : `<div class="me-acts"><button class="ghost xs" data-edit="${t.id}" title="Put this message back in the box to change it">Edit</button><button class="ghost xs" data-copyreq="${t.id}">Copy</button></div>`;
   wrap.innerHTML = `<div class="me"><div>${esc(t.request)}</div></div>${mine}
-    <div class="od"><div class="od-head">${head}</div>${critList(t)}${stepsList(t)}${picsHtml(t)}${answer}${err}${changes}${undone}${flagHtml}${checks}
+    <div class="od"><div class="od-head">${head}</div>${critList(t)}${stepsList(t)}${picsHtml(t)}${answer}${P3.turnExtras(t)}${err}${changes}${undone}${flagHtml}${checks}
       <div class="cards-slot" data-task="${t.id}"></div>${foot}</div>`;
   return wrap;
 }
@@ -486,6 +487,9 @@ function cardNode(c) {
       prev = `<div class="prev">${p.edits.map((e) => `<span class="del">- ${esc(e.old)}</span>\n<span class="add">+ ${esc(e.new)}</span>`).join("\n\n")}</div>`;
     } else if (p.url || p.query) {
       prev = `<div class="prev mono">${esc(p.url || p.query)}</div>`;
+    } else if (p.content_preview !== undefined || p.old_title !== undefined) {
+      // memory: what it wants to save / change
+      prev = `<div class="prev">${p.kind ? `<b>${esc(P3.kindName(p.kind))}</b>: ` : ""}${esc(p.title || p.new_title || "")}${p.old_title && p.old_title !== p.new_title ? `\n(was: ${esc(p.old_title)})` : ""}${p.content_preview ? "\n\n" + esc(p.content_preview) : ""}</div>`;
     } else if (p.inputs) {
       prev = `<div class="prev">${esc(JSON.stringify(p.inputs, null, 2))}</div>`;
     }
@@ -717,6 +721,7 @@ function switchTab(tab) {
   if (tab === "logs") loadLogs();
   if (tab === "tools") renderTools();
   if (tab === "settings") renderSettings();
+  P3.tab(tab);
 }
 
 /* ---------------------------------------------------------------- status */
@@ -922,6 +927,7 @@ function renderSettings() {
       <div class="row2"><label>Copy buttons on answers</label>${sw("copy_numbers", "number + copy button on every piece")}</div>
       <div class="hint row2"><span></span><span class="hint">Every paragraph, list item, table and code block gets a number. Click it to copy, or type \u201ccopy 1 and 2\u201d, \u201ccopy 2-4\u201d, \u201ccopy code\u201d or \u201ccopy all\u201d in the message box (that never uses usage).</span></div>
     </div>
+    ${P3.settingsHtml(s, opt, sw, num)}
     <div class="st-sec"><h3>Brain (Claude)</h3>
       <div class="row2"><label>Model</label><select data-k="model">${modelOpts}</select></div>
       <div class="row2"><label>Backup model if Claude is busy</label><select data-k="fallback_model">${fbOpts}</select></div>
@@ -1059,12 +1065,14 @@ function bindUI() {
     if (ed) { const t = S.tasks.get(ed.dataset.edit); if (t) { $("#msg").value = t.request; autoGrow(); $("#msg").focus(); toast("Change it and press Send. It goes as a new message.", "", 4000); } }
     const pic = e.target.closest("[data-pic]");
     if (pic) openPicture(pic.dataset.pic, Number(pic.dataset.i));
+    P3.feedClick(e);
   });
   $("#feed").addEventListener("keydown", (e) => { const pic = e.target.closest && e.target.closest("[data-pic]"); if (pic && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openPicture(pic.dataset.pic, Number(pic.dataset.i)); } });
   $("#lb-x").addEventListener("click", closePicture);
   $("#lb-prev").addEventListener("click", () => stepPicture(-1));
   $("#lb-next").addEventListener("click", () => stepPicture(1));
   $("#lightbox").addEventListener("click", (e) => { if (e.target.id === "lightbox") closePicture(); });
+  P3.bind();
   $("#chat-q").addEventListener("input", searchChats);
   $("#chat-title").addEventListener("dblclick", () => { if (S.conv) renameChat(S.conv); });
   $("#run-tests").addEventListener("click", runTests);

@@ -14,11 +14,12 @@
       <img src="/static/logo.svg" alt="" class="mark">
       <div>
         <div class="word">OVERDRIVE</div>
-        <div class="sub">Piece 2 <span class="dot">&middot;</span> ChatGPT mode</div>
+        <div class="sub">Piece 3 <span class="dot">&middot;</span> the rest</div>
       </div>
     </div>
     <nav id="nav">
       <button data-tab="chat" class="on"><span class="ic ic-chat"></span>Chat</button>
+      <button data-tab="memory"><span class="ic ic-brain"></span>Memory <span id="nav-mem" class="pill"></span></button>
       <button data-tab="status"><span class="ic ic-grid"></span>Status <span id="nav-points" class="pill"></span></button>
       <button data-tab="logs"><span class="ic ic-log"></span>Logs</button>
       <button data-tab="tools"><span class="ic ic-tool"></span>Tools</button>
@@ -61,6 +62,19 @@
         <textarea id="msg" rows="1" placeholder="Tell OVERDRIVE what to do..." maxlength="20000"></textarea>
         <button id="send" type="submit" class="primary">Send</button>
       </form>
+    </section>
+
+    <!-- MEMORY (Piece 3) -->
+    <section id="tab-memory" class="tab">
+      <header class="bar"><div class="bar-title">Memory</div>
+        <div class="bar-right">
+          <input id="mem-q" type="search" placeholder="What do you remember about..." size="26" autocomplete="off" spellcheck="false">
+          <label class="check"><input type="checkbox" id="mem-arch"> Archived</label>
+          <button id="mem-import-btn" class="ghost">Import my memory</button>
+        </div>
+      </header>
+      <div id="mem-cats" class="mem-cats"></div>
+      <div class="scroll" id="mem-body"><div class="loading">Loading...</div></div>
     </section>
 
     <!-- STATUS -->
@@ -135,6 +149,7 @@
 </div>
 <div id="toasts"></div>
 <script src="/static/md.js"></script>
+<script src="/static/p3.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

@@ -18,6 +18,8 @@ function start(port, ...extra) {
     const onData = (d) => {
       buf += d.toString();
       const m = buf.match(/URL (\S+)/);
+      const nm = buf.match(/NOTES (.+)/);
+      if (nm) p.notes = nm[1].trim();
       if (m && !p.ready) {
         p.ready = true;
         clearTimeout(t);
@@ -38,8 +40,9 @@ function start(port, ...extra) {
   fs.mkdirSync(out, { recursive: true });
   const scale = process.argv.includes("--scale") ? Number(process.argv[process.argv.indexOf("--scale") + 1]) : 1;
   const errors = [];
-  const [srv, url] = await start(47999);
-  const [srv2, url2] = await start(47998, "--no-cli");
+  const base = 41000 + Math.floor(Math.random() * 8000) * 2;     // fresh ports every run (old ones may be cooling down)
+  const [srv, url] = await start(base);
+  const [srv2, url2] = await start(base + 1, "--no-cli");
   const shot = (page, name) => page.screenshot({ path: path.join(out, name) });
   const assert = (cond, msg) => { if (!cond) throw new Error("ASSERT: " + msg); };
   let browser;
@@ -207,6 +210,54 @@ function start(port, ...extra) {
     await page.click("#chats .chat-row >> nth=0 >> [data-del]");
     await page.waitForSelector("#chats >> text=No chats yet", { timeout: 5000 });
     assert(await page.isVisible("#empty"), "deleted chat leaves an empty feed");
+
+    // ---- Piece 3, part 1: memory
+    await page.fill("#msg", "remember that I love realistic racing games");
+    await page.keyboard.press("Enter");
+    await page.waitForSelector(".memsaved .ms-row >> text=Likes realistic racing games", { timeout: 30000 });
+    await shot(page, "12-memory-saved.png");
+    await page.click("#nav [data-tab=memory]");
+    await page.waitForSelector(".mem-row >> text=Likes realistic racing games", { timeout: 8000 });
+    assert((await page.innerText("#nav-mem")) === "1", "memory count in the menu");
+    await page.click("#nav [data-tab=chat]");
+    await page.click(".memsaved [data-memundo]");
+    await page.waitForSelector(".ms-row.undone", { timeout: 5000 });
+    await page.click("#nav [data-tab=memory]");
+    await page.waitForSelector(".mem-empty", { timeout: 5000 });
+    await page.click("#mem-import-btn");
+    await page.fill("#imp-path", srv.notes);
+    await page.click("#imp-go");
+    await page.waitForSelector(".imp-done", { timeout: 10000 });
+    assert((await page.innerText(".imp-done")).includes("new"), "import result");
+    await shot(page, "13-memory-import.png");
+    await page.click("#drawer-x");
+    await page.waitForSelector(".mem-row >> nth=5", { timeout: 5000 });
+    await page.click("[data-mcat=rules]");
+    await page.waitForSelector("[data-mcat=rules].on", { timeout: 5000 });
+    assert((await page.$$(".mem-row")).length === 4, "4 rules");
+    await page.click("[data-mcat=all]");
+    await page.waitForSelector("[data-mcat=all].on", { timeout: 5000 });
+    await page.fill("#mem-q", "engine sounds");
+    await page.waitForFunction(() => document.querySelectorAll(".mem-row").length === 3, null, { timeout: 5000 });
+    const racing = ".mem-row:has(.mr-title:text-is('RACING GAME'))";
+    await page.click(`${racing} [data-mact=pin]`);
+    await page.waitForSelector(".mem-row.pinned .mr-title:text-is('RACING GAME')", { timeout: 5000 });
+    await page.click(`${racing} [data-mact=edit]`);
+    await page.fill(".me-content", "Realistic street racer. Next: engine sounds, then the night map and rain.");
+    await page.click("[data-mact=save]");
+    await page.waitForSelector(".mem-row >> text=night map and rain", { timeout: 5000 });
+    assert(await page.isVisible(".mem-row.pinned .mr-title:text-is('RACING GAME')"), "pin survives an edit");
+    await page.fill("#mem-q", "");
+    await page.waitForSelector(".mem-row >> nth=6", { timeout: 5000 });
+    await shot(page, "14-memory-page.png");
+    await page.click(".mem-row:has(.mr-title:text-is('SPACE GAME')) [data-mact=archive]");
+    await page.waitForSelector(".mc-arch", { timeout: 5000 });
+    await page.check("#mem-arch");
+    await page.waitForSelector(".mem-row.arch >> text=SPACE GAME", { timeout: 5000 });
+    await page.click(".mem-row.arch [data-mact=forget]");
+    await page.waitForSelector(".mem-empty", { timeout: 5000 });
+    await page.uncheck("#mem-arch");
+    await page.click("#nav [data-tab=chat]");
   } catch (e) {
     errors.push(String(e && e.stack || e));
   } finally {

@@ -33,7 +33,7 @@ from .jsonio import atomic_write_json, read_json
 from .settings import MODELS, SettingsError
 
 UI = Path(__file__).resolve().parent / "ui"
-STATIC = {"app.js": "text/javascript", "md.js": "text/javascript", "app.css": "text/css", "logo.svg": "image/svg+xml",
+STATIC = {"app.js": "text/javascript", "md.js": "text/javascript", "p3.js": "text/javascript", "app.css": "text/css", "logo.svg": "image/svg+xml",
           "favicon.svg": "image/svg+xml"}
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; "
        "font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'")
@@ -110,6 +110,8 @@ class Server:
             "event_seq": od.events.last_seq,
             "removed_env": od.removed_env,
             "home": str(od.paths.home),
+            "notes": list(od.startup_notes),
+            "memory_counts": od.memory.counts(),
         }
 
     def _routes(self) -> list[Route]:
@@ -127,6 +129,10 @@ class Server:
             ("/api/export", self.export, ["POST"]),
             ("/api/chat/rename", self.chat_rename, ["POST"]), ("/api/chat/delete", self.chat_delete, ["POST"]),
             ("/api/chat/search", self.chat_search, ["GET"]), ("/api/open", self.open, ["POST"]), ("/api/quit", self.quit, ["POST"]),
+            # Piece 3: memory page
+            ("/api/memory", self.memory_page, ["GET"]), ("/api/memory/edit", self.memory_edit, ["POST"]),
+            ("/api/memory/set", self.memory_set, ["POST"]), ("/api/memory/forget", self.memory_forget, ["POST"]),
+            ("/api/memory/import", self.memory_import, ["POST"]), ("/api/memory/undo", self.memory_undo, ["POST"]),
         ):
             r.append(Route(path, fn, methods=methods))
         return r
@@ -375,6 +381,70 @@ class Server:
     async def chat_search(self, request: Request) -> Response:
         q = request.query_params.get("q", "")[:200]
         return JSONResponse({"hits": await asyncio.to_thread(self.od.search_conversations, q)})
+
+    # ------------------------------------------------------------------ memory page (Piece 3)
+    async def memory_page(self, request: Request) -> Response:
+        p = request.query_params
+        from .memory import CATEGORIES, CATEGORY_NAMES
+        cat = p.get("cat", "all")
+        if cat not in CATEGORIES and cat != "all":
+            cat = "all"
+        status = "archived" if p.get("archived") == "1" else "active"
+        try:
+            limit, offset = int(p.get("limit", "100") or 100), int(p.get("offset", "0") or 0)
+        except ValueError:
+            limit, offset = 100, 0
+        page = await asyncio.to_thread(self.od.memory.page, cat, p.get("q", "")[:300], status, limit, offset)
+        return JSONResponse({**page, "counts": await asyncio.to_thread(self.od.memory.counts),
+                             "names": CATEGORY_NAMES, "save": self.od.settings.get("memory_save")})
+
+    async def memory_edit(self, request: Request) -> Response:
+        b = await self._json(request)
+        tags = b.get("tags")
+        if tags is not None and (not isinstance(tags, list) or not all(isinstance(t, str) for t in tags)):
+            return JSONResponse({"error": "tags must be a list of words"}, 400)
+        try:
+            row = self.od.memory_edit(str(b.get("id") or ""), b.get("title"), b.get("content"), tags)
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, 400)
+        self.od.events.publish("memory_changed", op="edit")
+        return JSONResponse({"row": row})
+
+    async def memory_set(self, request: Request) -> Response:
+        b = await self._json(request)
+        try:
+            row = self.od.memory_set(str(b.get("id") or ""), str(b.get("action") or ""))
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, 400)
+        self.od.events.publish("memory_changed", op=str(b.get("action")))
+        return JSONResponse({"row": row})
+
+    async def memory_forget(self, request: Request) -> Response:
+        b = await self._json(request)
+        try:
+            res = self.od.memory_forget(str(b.get("id") or ""))
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, 400)
+        self.od.events.publish("memory_changed", op="forget")
+        return JSONResponse(res)
+
+    async def memory_import(self, request: Request) -> Response:
+        b = await self._json(request)
+        path = str(b.get("path") or "").strip().strip('"')
+        if not path:
+            return JSONResponse({"error": "Type the folder or .zip path first."}, 400)
+        try:
+            res = await asyncio.to_thread(self.od.memory_import, Path(path))
+        except (ValueError, OSError) as e:
+            return JSONResponse({"error": str(e)}, 400)
+        return JSONResponse(res)
+
+    async def memory_undo(self, request: Request) -> Response:
+        b = await self._json(request)
+        try:
+            return JSONResponse(self.od.undo_memory(str(b.get("task") or ""), int(b.get("index", -1))))
+        except (ValueError, TypeError) as e:
+            return JSONResponse({"error": str(e)}, 400)
 
     async def export(self, request: Request) -> Response:
         path = await asyncio.to_thread(self.od.export_zip)

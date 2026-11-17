@@ -25,7 +25,8 @@ from .journal import Entry, Journal
 from .jsonio import atomic_write_json, read_json, utc_now_iso
 from .limits import Usage
 from .memory import Memory
-from .memory_tools import register_memory_tools
+from .memory import MemoryError as MemoryError_
+from .memory_tools import is_sensitive, register_memory_tools
 from .paths import Paths, default_home
 from .permissions import Broker, Card, Grants, Risk, decide
 from .pictures import SHOW_PICTURES_SPEC, PictureStore
@@ -131,6 +132,7 @@ class Overdrive:
         self._conv_path = self.paths.data / "conversations.json"
         self.conversations: dict[str, Conversation] = {}
         self._load_conversations()
+        self.startup_notes: list[str] = []      # shown once in the window (e.g. "I read your memory pack")
         self.removed_env = [] if test_env else brain.clean_env_for_plan()
         self.audit.on_write(lambda e: self.events.publish("log", entry={k: e[k] for k in ("seq", "ts", "kind", "task")}))
         self.audit.write("app_start", {
@@ -319,8 +321,11 @@ class Overdrive:
         policy = decide(s.get("permissions"), risk)
         if spec.status == "experimental" and risk not in READ_RISKS and policy == "auto":
             policy = "ask"
-        if spec.name.startswith("memory_") and risk not in READ_RISKS and policy == "auto":
-            policy = "ask"   # memory changes always ask for now (Piece 3 adds "saves + tells you" with Undo)
+        mem_why = ""
+        if spec.name.startswith("memory_") and risk not in READ_RISKS and policy != "block":
+            # Piece 3 (their pick): normal things save + tell you (Undo); personal things and rules ask first.
+            mem_why = self._memory_needs_ask(st, spec.name, inp)
+            policy = "ask" if mem_why else "auto"
         decision = "auto"
         if policy == "block":
             st.journal.add(spec.name, inp, risk.value, "blocked", "policy")
@@ -331,6 +336,8 @@ class Overdrive:
         if policy == "ask":
             ctx_tool = ToolContext(workspace=self.workspace, task=rec, settings=s, audit=self.audit)
             preview = spec.preview(inp, ctx_tool) if spec.preview else {"inputs": summarize_args(inp, 1200)}
+            if mem_why:
+                preview = dict(preview, why=f"Memory asks first because {mem_why}.")
             body = {"tool": spec.name, "tool_title": spec.title, "risk": risk.value, "risk_label": risk.label,
                     "reason": inp.get("reason", ""), "preview": preview, "network": spec.network}
             title = f"OVERDRIVE wants to: {spec.title}"
@@ -353,6 +360,23 @@ class Overdrive:
         st.pending.setdefault(_key(spec.name, inp), []).append(entry)
         self.grants.issue(spec.name, inp)
         return PermissionResultAllow()
+
+    MEMORY_AUTO_PER_TASK = 8
+
+    def _memory_needs_ask(self, st: RunState, name: str, inp: dict) -> str:
+        """Why this memory write must ask the human first ("" = save it and tell them)."""
+        if self.settings.get("memory_save") == "ask":
+            return "your setting says memory always asks"
+        row = None
+        if name in ("memory_update", "memory_archive"):
+            row = self.memory.get(str(inp.get("id") or ""))
+        why = is_sensitive(inp, row)
+        if why:
+            return why
+        auto = sum(1 for m in st.rec.memory_changes if m.get("decision") == "auto")
+        if auto >= self.MEMORY_AUTO_PER_TASK:
+            return f"it already saved {auto} things in this one task (no memory spam)"
+        return ""
 
     def _note_refused(self, st: RunState, tool_name: str, title: str, risk: str, decision: str, why: str,
                       inp: dict) -> None:
@@ -722,6 +746,10 @@ class Overdrive:
         st.journal.finish(entry, ok=not res.is_error, summary=res.text, changes=res.changes, side_effect=side_effect)
         if res.changes:
             rec.changes.extend(c for c in res.changes if c.get("op") not in (None, "unchanged"))
+        if res.data and isinstance(res.data.get("memory"), dict) and not res.is_error:
+            rec.memory_changes.append(dict(res.data["memory"], decision=entry.decision, undone=False,
+                                           ts=utc_now_iso()))
+            self.events.publish("memory_changed", op=res.data["memory"].get("op"))
         if res.data and isinstance(res.data.get("pictures"), list) and res.data["pictures"]:
             rec.pictures.extend(res.data["pictures"][:8])
             del rec.pictures[:-24]                      # at most 24 pictures per answer
@@ -1081,6 +1109,121 @@ class Overdrive:
         self.audit.write("undo", {"results": results}, task=rec.id)
         self._emit_task(rec)
         return {"task": rec.public(), "results": results}
+
+    def undo_memory(self, task_id: str, index: int) -> dict:
+        """The Undo button next to "Saved to memory": puts memory back the way it was."""
+        rec = self.task_store.load(task_id)
+        if rec is None:
+            raise ValueError("no such task")
+        if self.current is not None and self.current.rec.id == task_id:
+            rec = self.current.rec
+        if not 0 <= index < len(rec.memory_changes):
+            raise ValueError("no such memory change")
+        ch = rec.memory_changes[index]
+        if ch.get("undone"):
+            raise ValueError("already undone")
+        op = ch.get("op")
+        try:
+            if op == "remember":
+                if self.memory.get(ch["id"]) is not None:
+                    self.memory.forget(ch["id"], provenance="you (Undo in chat)")
+            elif op == "update":
+                self.memory.revert_update(ch["id"])
+            elif op == "archive":
+                self.memory.unarchive(ch["id"])
+            else:
+                raise ValueError("unknown memory change")
+        except MemoryError_ as e:
+            raise ValueError(str(e))
+        ch["undone"] = True
+        self.task_store.save(rec)
+        self.audit.write("memory_undo", {"change": ch}, task=rec.id)
+        self._emit_task(rec)
+        self.events.publish("memory_changed", op="undo")
+        return {"task": rec.public()}
+
+    # ------------------------------------------------------------------ memory page (Piece 3)
+    def memory_edit(self, row_id: str, title: str | None, content: str | None, tags: list | None) -> dict:
+        patch: dict[str, Any] = {}
+        if title is not None:
+            patch["title"] = title
+        if content is not None:
+            patch["content"] = content
+        if tags is not None:
+            patch["tags"] = tags
+        if not patch:
+            raise ValueError("nothing to change")
+        try:
+            row = self.memory.update(row_id, patch, provenance="you (Memory page)")
+        except MemoryError_ as e:
+            raise ValueError(str(e))
+        self.audit.write("memory_edited", {"old": row_id, "new": row.id, "fields": sorted(patch), "by": "you"})
+        return row.to_dict()
+
+    def memory_forget(self, row_id: str) -> dict:
+        try:
+            row = self.memory.forget(row_id, provenance="you (Memory page)")
+        except MemoryError_ as e:
+            raise ValueError(str(e))
+        self.audit.write("memory_forgotten", {"id": row_id, "kind": row.kind, "title": row.title, "by": "you"})
+        return {"deleted": row_id}
+
+    def memory_set(self, row_id: str, action: str) -> dict:
+        try:
+            if action == "pin":
+                row = self.memory.set_pinned(row_id, True)
+            elif action == "unpin":
+                row = self.memory.set_pinned(row_id, False)
+            elif action == "archive":
+                row = self.memory.archive(row_id, provenance="you (Memory page)")
+            elif action == "unarchive":
+                row = self.memory.unarchive(row_id)
+            else:
+                raise ValueError("unknown action")
+        except MemoryError_ as e:
+            raise ValueError(str(e))
+        self.audit.write("memory_" + action, {"id": row_id, "title": row.title, "by": "you"})
+        return row.to_dict()
+
+    def memory_import(self, source: Path, label: str = "", by: str = "you (Memory page)") -> dict:
+        from .memory_import import file_sha, import_notes
+        src = Path(source).expanduser()
+        if not src.exists():
+            raise ValueError(f"Can't find {src}")
+        res = import_notes(self.memory, src, label=label)
+        try:
+            done = read_json(self.paths.data / "imports.json", {}) or {}
+            done[file_sha(src)] = {"when": utc_now_iso(), "source": str(src),
+                                   **{k: res[k] for k in ("added", "updated", "unchanged")}}
+            atomic_write_json(self.paths.data / "imports.json", done)
+        except OSError:
+            pass
+        self.audit.write("memory_import", {k: res[k] for k in ("files", "sections", "added", "updated", "unchanged",
+                                                               "kept_deleted", "by_kind", "source")} | {"by": by})
+        self.events.publish("memory_changed", op="import")
+        return res
+
+    def auto_import_packs(self) -> list[dict]:
+        """First start: a memory-pack.zip shipped next to OVERDRIVE is read in once (so you never paste stuff).
+        The same pack is never imported twice; a newer pack updates the rows that changed."""
+        from .memory_import import file_sha, find_packs
+        app_root = Path(__file__).resolve().parent.parent
+        roots = [self.paths.home, app_root, app_root.parent]
+        done = read_json(self.paths.data / "imports.json", {}) or {}
+        out = []
+        for pack in find_packs(roots):
+            try:
+                sha = file_sha(pack)
+                if sha in done:
+                    continue
+                res = self.memory_import(pack, label="memory pack", by="OVERDRIVE (first start)")
+                out.append(res)
+                self.startup_notes.append(
+                    f"I read your memory pack: {res['added']} new things, {res['updated']} updated. "
+                    "See them on the Memory page.")
+            except Exception as e:  # never stop OVERDRIVE from starting over this
+                self.audit.write("memory_import_failed", {"pack": str(pack), "error": repr(e)[:500]})
+        return out
 
     def export_zip(self) -> Path:
         """Everything OVERDRIVE knows, in plain JSON/JSONL, in one zip (rule 43)."""

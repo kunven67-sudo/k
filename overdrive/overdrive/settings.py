@@ -46,6 +46,8 @@ DEFAULTS: dict[str, Any] = {
     "pictures": "real",          # real / ai / both / off
     "own_ideas": True,           # "My ideas:" after plans and builds
     "copy_numbers": True,        # numbered copy buttons on every answer piece (window only)
+    # Piece 3
+    "memory_save": "tell",       # tell = normal things save + tell you (Undo); ask = every save asks first
 }
 
 _SCHEMA: dict[str, tuple] = {
@@ -68,6 +70,7 @@ _SCHEMA: dict[str, tuple] = {
     "pictures": (str, lambda v: v in ("real", "ai", "both", "off"), "Pictures"),
     "own_ideas": (bool, None, "Its own ideas"),
     "copy_numbers": (bool, None, "Copy buttons on answers"),
+    "memory_save": (str, lambda v: v in ("tell", "ask"), "Memory saving"),
 }
 
 

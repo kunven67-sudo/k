@@ -63,6 +63,7 @@ class TaskRecord:
     rerun_of: str | None = None
     mode: str = "build"          # "chat" or "build" (older tasks were all build-style)
     pictures: list[dict] = field(default_factory=list)   # Piece 2: pictures shown with this answer
+    memory_changes: list[dict] = field(default_factory=list)   # Piece 3: "Saved to memory" + Undo
 
     def public(self) -> dict:
         return asdict(self)
