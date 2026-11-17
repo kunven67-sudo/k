@@ -57,9 +57,21 @@
           </div>
         </div>
       </div>
+      <div id="queue-box" class="queue-box hidden"></div>
+      <div id="voice-bar" class="voice-bar hidden" aria-live="polite">
+        <div class="vb-orb" id="vb-orb"><i></i><i></i><i></i><b></b></div>
+        <div class="vb-text"><div class="vb-state" id="vb-state">Listening</div><div class="vb-heard" id="vb-heard">Say something...</div></div>
+        <div class="vb-btns">
+          <button type="button" id="vb-mute" class="ghost" title="Mute or unmute your mic (Ctrl+M)">Mute mic</button>
+          <button type="button" id="vb-skip" class="ghost" title="Stop it talking (Esc)">Stop talking</button>
+          <button type="button" id="vb-end" class="danger" title="Leave voice mode (Ctrl+Shift+Space)">End voice</button>
+        </div>
+      </div>
       <form id="composer" autocomplete="off">
         <button id="mode" type="button" class="mode-pill chat" title="">Chat mode</button>
         <textarea id="msg" rows="1" placeholder="Tell OVERDRIVE what to do..." maxlength="20000"></textarea>
+        <button id="mic" type="button" class="icon-btn" title="Talk and it types (Ctrl+Space)"><span class="ic ic-mic"></span></button>
+        <button id="voice" type="button" class="icon-btn" title="Voice mode: talk with it out loud (Ctrl+Shift+Space)"><span class="ic ic-wave"></span></button>
         <button id="send" type="submit" class="primary">Send</button>
       </form>
     </section>

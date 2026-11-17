@@ -133,6 +133,8 @@ class Overdrive:
         self.conversations: dict[str, Conversation] = {}
         self._load_conversations()
         self.startup_notes: list[str] = []      # shown once in the window (e.g. "I read your memory pack")
+        self.queue: list[dict] = []             # Piece 3: messages you sent (typed or said) while it was busy
+        self._queue_paused = False              # STOP pauses the queue until you send again
         self.removed_env = [] if test_env else brain.clean_env_for_plan()
         self.audit.on_write(lambda e: self.events.publish("log", entry={k: e[k] for k in ("seq", "ts", "kind", "task")}))
         self.audit.write("app_start", {
@@ -229,6 +231,72 @@ class Overdrive:
         self._emit_task(rec)
         self._run_task_handle = asyncio.create_task(self._run_task(st))
         return rec
+
+    # ------------------------------------------------------------------ queue (Piece 3: talk to it mid-build)
+    MAX_QUEUE = 10
+
+    def enqueue(self, text: str, conversation_id: str | None = None, source: str = "typed") -> dict:
+        """A message sent while a task runs waits here and goes in right after (no 'busy' error)."""
+        text = (text or "").strip()
+        if not text:
+            raise ValueError("empty message")
+        if len(text) > 20000:
+            raise ValueError("message is too long (20,000 characters max)")
+        if len(self.queue) >= self.MAX_QUEUE:
+            raise ValueError(f"{self.MAX_QUEUE} messages are already waiting. Wait a bit, or remove one.")
+        conv = conversation_id or (self.current.conv.id if self.current else None)
+        item = {"id": "q" + secrets.token_hex(4), "text": text, "conversation": conv, "source": source,
+                "ts": utc_now_iso()}
+        self.queue.append(item)
+        self._queue_paused = False
+        self.audit.write("queued", {"text": text, "conversation": conv, "source": source})
+        self.events.publish("queue", queue=list(self.queue))
+        if self.current is None:
+            self._kick_queue()
+        return item
+
+    def unqueue(self, qid: str) -> None:
+        before = len(self.queue)
+        self.queue = [q for q in self.queue if q["id"] != qid]
+        if len(self.queue) == before:
+            raise ValueError("that message isn't waiting anymore")
+        self.events.publish("queue", queue=list(self.queue))
+
+    async def send_queued(self, qid: str) -> TaskRecord:
+        item = next((q for q in self.queue if q["id"] == qid), None)
+        if item is None:
+            raise ValueError("that message isn't waiting anymore")
+        if self.current is not None:
+            raise Busy("It's still working. Your message goes in by itself when this step is done.")
+        self.queue.remove(item)
+        self._queue_paused = False
+        self.events.publish("queue", queue=list(self.queue))
+        return await self.send(self._queued_text(item), item["conversation"])
+
+    @staticmethod
+    def _queued_text(item: dict) -> str:
+        how = "said" if item.get("source") == "voice" else "sent"
+        return f"(I {how} this while you were working on the last message.) {item['text']}"
+
+    def _kick_queue(self) -> None:
+        try:
+            asyncio.get_running_loop().create_task(self._drain_queue())
+        except RuntimeError:
+            pass
+
+    async def _drain_queue(self) -> None:
+        await asyncio.sleep(0.8)       # after an automatic "GO, build it" follow-up has had its turn
+        if self.current is not None or not self.queue or self._queue_paused:
+            return
+        item = self.queue.pop(0)
+        self.events.publish("queue", queue=list(self.queue))
+        try:
+            await self.send(self._queued_text(item), item["conversation"])
+        except Busy:
+            self.queue.insert(0, item)
+            self.events.publish("queue", queue=list(self.queue))
+        except Exception as e:
+            self.audit.write("queue_send_failed", {"error": repr(e), "text": item["text"]})
 
     async def wait_current(self, timeout: float = 600) -> TaskRecord | None:
         h = self._run_task_handle
@@ -1026,6 +1094,10 @@ class Overdrive:
         self.events.publish("usage", usage=self.usage.public())
         if st.build_go and not st.stopped and not st.error_kind and not st.limit:
             self._go_build_handle = asyncio.create_task(self._go_build(st.conv.id))
+        if st.stopped:
+            self._queue_paused = bool(self.queue)   # you pressed STOP: waiting messages wait for "Send now"
+        if self.queue and not self._queue_paused:
+            self._kick_queue()
         return rec
 
     def test_env_skip_double_check(self) -> bool:

@@ -9,6 +9,7 @@ const P3 = {
 /* ---------------------------------------------------------------- hooks app.js calls */
 P3.state = function (st) {
   P3.paintMemCount(st.memory_counts);
+  P3.renderQueue(st.queue);
   const notes = st.notes || [];
   for (const n of notes) {
     const key = "od_note_" + n;
@@ -25,6 +26,7 @@ P3.event = function (ev) {
       if (S.tab === "memory" && !P3.mem.editing) P3.loadMemory();
       else P3.refreshMemCount();
       break;
+    case "queue": if (S.state) S.state.queue = ev.queue; P3.renderQueue(ev.queue); break;
     default: break;
   }
 };
@@ -51,7 +53,19 @@ P3.feedClick = function (e) {
 };
 
 P3.settingsHtml = function (s, opt, sw, num) {
-  return `<div class="st-sec"><h3>Memory</h3>
+  const voices = P3.voices().slice().sort((a, b) => a.lang.localeCompare(b.lang) || a.name.localeCompare(b.name));
+  const vOpts = opt("", "Best natural voice (automatic)", s.voice_name) + voices.map((v) => opt(v.name, `${v.name} (${v.lang})`, s.voice_name)).join("");
+  const range = (k, min, max, step) => `<span class="range"><input type="range" data-k="${k}" min="${min}" max="${max}" step="${step}" value="${s[k]}"><b data-rv="${k}">${Number(s[k]).toFixed(2)}x</b></span>`;
+  return `<div class="st-sec"><h3>Voice</h3>
+      <div class="row2"><label>Its voice</label><span class="inl"><select data-k="voice_name">${vOpts}</select><button type="button" class="ghost" id="voice-test">Test</button></span></div>
+      <div class="hint row2"><span></span><span class="hint">The \u201cNatural\u201d voices sound like a real person (Edge gives them free, they need the internet). The others work offline.</span></div>
+      <div class="row2"><label>Talking speed</label>${range("voice_rate", 0.6, 1.6, 0.05)}</div>
+      <div class="row2"><label>Pitch</label>${range("voice_pitch", 0.6, 1.4, 0.02)}</div>
+      <div class="row2"><label>Read answers out loud</label><select data-k="voice_read">${opt("voice_mode", "Only in voice mode", s.voice_read)}${opt("always", "Always", s.voice_read)}${opt("off", "Never", s.voice_read)}</select></div>
+      <div class="row2"><label>Voice follows its mood</label>${sw("voice_moods", "a bit faster when it's excited, slower when it's down")}</div>
+      <div class="hint row2"><span></span><span class="hint">Mic button (Ctrl+Space): you talk, it types. Voice mode (Ctrl+Shift+Space): you talk, it talks back, even while it builds. Ctrl+M mutes your mic. No wake word, ever.</span></div>
+    </div>
+    <div class="st-sec"><h3>Memory</h3>
       <div class="row2"><label>Saving to memory</label><select data-k="memory_save">${opt("tell", "Saves normal things and tells me (Undo button)", s.memory_save)}${opt("ask", "Always ask me first", s.memory_save)}</select></div>
       <div class="hint row2"><span></span><span class="hint">Personal things (health, money, family, love life, feelings) and new rules ALWAYS ask first, whatever this says. The same thing is never saved twice.</span></div>
       <div class="btns"><button type="button" class="ghost" id="set-mem-open">Open the Memory page</button></div>
@@ -63,7 +77,32 @@ P3.bind = function () {
   $("#mem-arch").addEventListener("change", () => { P3.mem.archived = $("#mem-arch").checked; P3.loadMemory(); });
   $("#mem-import-btn").addEventListener("click", P3.showImport);
   $("#mem-body").addEventListener("click", P3.memClick);
-  $("#settings-body").addEventListener("click", (e) => { if (e.target.id === "set-mem-open") switchTab("memory"); });
+  $("#settings-body").addEventListener("click", (e) => {
+    if (e.target.id === "set-mem-open") switchTab("memory");
+    if (e.target.id === "voice-test") {
+      const sel = $("[data-k=voice_name]"), rate = $("[data-k=voice_rate]"), pitch = $("[data-k=voice_pitch]");
+      const keep = Object.assign({}, S.state.settings);
+      Object.assign(S.state.settings, { voice_name: sel.value, voice_rate: Number(rate.value), voice_pitch: Number(pitch.value) });
+      P3.shush(); P3.say("Yo! This is how I sound. Pretty good, right?");
+      Object.assign(S.state.settings, { voice_name: keep.voice_name, voice_rate: keep.voice_rate, voice_pitch: keep.voice_pitch });
+    }
+  });
+  $("#settings-body").addEventListener("input", (e) => { const k = e.target.dataset && e.target.dataset.k; if (k && e.target.type === "range") { const b = $(`[data-rv="${k}"]`); if (b) b.textContent = Number(e.target.value).toFixed(2) + "x"; } });
+  $("#queue-box").addEventListener("click", P3.queueClick);
+  $("#mic").addEventListener("click", P3.toggleDictation);
+  $("#voice").addEventListener("click", P3.toggleVoice);
+  $("#vb-mute").addEventListener("click", P3.toggleMute);
+  $("#vb-skip").addEventListener("click", P3.shush);
+  $("#vb-end").addEventListener("click", P3.endVoice);
+  $("#vb-orb").addEventListener("click", () => { if (P3.v.speaking) P3.shush(); else P3.toggleMute(); });
+  if (window.speechSynthesis) speechSynthesis.onvoiceschanged = () => { if (S.tab === "settings" && !$("[data-k=voice_name]:focus")) renderSettings(); };
+  document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey && e.code === "Space") { e.preventDefault(); if (e.shiftKey) P3.toggleVoice(); else P3.toggleDictation(); }
+    else if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "m" && P3.v.mode) { e.preventDefault(); P3.toggleMute(); }
+    else if (e.key === "Escape" && P3.v.speaking) P3.shush();
+  });
+  // Enter while the mic is typing: stop the mic first so the last words aren't lost
+  $("#msg").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && P3.v.dict) P3.endDictation(); }, true);
 };
 
 /* ---------------------------------------------------------------- memory page */
@@ -227,4 +266,264 @@ P3.showImport = function () {
 P3.undoMemory = async function (taskId, i) {
   try { const r = await api("/api/memory/undo", { task: taskId, index: i }); upsertTask(r.task); toast("Undone. Memory is back the way it was.", "ok", 3000); }
   catch (e) { toast(e.message, "bad"); }
+};
+
+/* ================================================================ Part 2: voice + the waiting queue
+   Talking: Edge's own speech typing (SpeechRecognition) and Edge's voices (speechSynthesis). Edge has
+   free "Natural" voices that sound real. No wake word: you press the mic button or Ctrl+Space. */
+P3.SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+P3.v = { rec: null, recFor: "", dict: false, mode: false, muted: false, speaking: false, base: "", heard: "",
+  silence: null, spoken: new Map(), streamed: new Map(), done: new Set(), q: [], restartAt: 0, errors: 0 };
+
+P3.queued = function (item) {
+  toast(item.source === "voice" ? "Got it. It goes in right after this step." : "It's still working, so your message waits and goes in right after this step.", "ok", 4500);
+};
+P3.renderQueue = function (queue) {
+  const box = $("#queue-box");
+  if (!box) return;
+  const q = queue || [];
+  box.classList.toggle("hidden", !q.length);
+  box.innerHTML = q.map((x) => `<div class="qi"><span class="qi-tag">${x.source === "voice" ? "Said" : "Waiting"}</span>
+    <span class="qi-text" title="${esc(x.text)}">${esc(x.text)}</span>
+    <button class="ghost xs" data-qsend="${esc(x.id)}">Send now</button><button class="ghost xs" data-qdel="${esc(x.id)}">Remove</button></div>`).join("");
+};
+P3.queueClick = async function (e) {
+  const s = e.target.closest("[data-qsend]"), d = e.target.closest("[data-qdel]");
+  if (!s && !d) return;
+  try { await api("/api/queue", { id: (s || d).dataset[s ? "qsend" : "qdel"], action: s ? "send" : "remove" }); }
+  catch (err) { toast(err.message, "warn"); }
+};
+
+/* ---- the mic (dictation: letters show up while you talk) */
+P3.micError = function (err) {
+  const why = {
+    "not-allowed": "The microphone is blocked. When Edge asks, press Allow. If it never asks: Windows Settings > Privacy > Microphone > let desktop apps use it.",
+    "service-not-allowed": "Edge's speech typing is turned off on this PC. Windows key + H also types what you say, anywhere.",
+    "audio-capture": "No microphone found. Plug one in (or pick it in Windows sound settings), then try again.",
+    network: "Edge's speech typing needs the internet. Windows key + H works too.",
+  }[err];
+  if (why) toast(why, "bad", 11000);
+};
+P3.startRec = function (forWhat) {
+  if (!P3.SR) { toast("This window can't hear you (no speech typing in it). Windows key + H types what you say, anywhere.", "bad", 9000); return false; }
+  P3.stopRec();
+  const r = new P3.SR();
+  r.continuous = true; r.interimResults = true; r.lang = navigator.language || "en-US";
+  r.onresult = (ev) => {
+    let fin = "", mid = "";
+    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+      const t = ev.results[i][0].transcript;
+      if (ev.results[i].isFinal) fin += t; else mid += t;
+    }
+    if (P3.v.recFor === "dict") P3.dictText(fin, mid); else P3.voiceHeard(fin, mid);
+  };
+  r.onerror = (ev) => { if (ev.error !== "no-speech" && ev.error !== "aborted") { P3.v.errors++; P3.micError(ev.error); if (["not-allowed", "service-not-allowed", "audio-capture"].includes(ev.error)) { P3.endDictation(); P3.endVoice(); } } };
+  r.onend = () => {
+    if (P3.v.rec !== r) return;
+    P3.v.rec = null;
+    // Edge stops listening after a quiet spell: keep going while the mic or voice mode is on
+    if (P3.v.recFor === "dict" && P3.v.dict) { P3.v.base = $("#msg").value; P3.startRec("dict"); }
+    else if (P3.v.recFor === "voice" && P3.v.mode && !P3.v.muted && !P3.v.speaking && P3.v.errors < 5) setTimeout(() => P3.listen(), 250);
+  };
+  P3.v.rec = r; P3.v.recFor = forWhat;
+  try { r.start(); } catch (e) { return false; }
+  return true;
+};
+P3.stopRec = function () { const r = P3.v.rec; P3.v.rec = null; if (r) { try { r.abort(); } catch (e) { /* already stopped */ } } };
+
+P3.toggleDictation = function () { if (P3.v.dict) P3.endDictation(); else P3.startDictation(); };
+P3.startDictation = function () {
+  if (P3.v.mode) P3.endVoice();
+  P3.v.base = $("#msg").value;
+  if (!P3.startRec("dict")) return;
+  P3.v.dict = true;
+  $("#mic").classList.add("on");
+  $("#msg").focus();
+};
+P3.endDictation = function () {
+  if (!P3.v.dict) return;
+  P3.v.dict = false;
+  if (P3.v.recFor === "dict") P3.stopRec();
+  $("#mic").classList.remove("on");
+};
+P3.dictText = function (fin, mid) {
+  const m = $("#msg");
+  const join = (a, b) => (a && b && !/\s$/.test(a) ? a + " " + b.trim() : a + b.trim());
+  if (fin) P3.v.base = join(P3.v.base, fin);
+  m.value = mid ? join(P3.v.base, mid) : P3.v.base;
+  autoGrow();
+};
+
+/* ---- voice mode: talk with it out loud (works in Chat AND Build mode) */
+P3.toggleVoice = function () { if (P3.v.mode) P3.endVoice(); else P3.startVoice(); };
+P3.startVoice = function () {
+  if (!P3.SR) { toast("This window can't hear you (no speech typing in it).", "bad", 8000); return; }
+  if (!window.speechSynthesis) { toast("This window has no voices to talk with.", "bad", 8000); return; }
+  P3.endDictation();
+  P3.v.mode = true; P3.v.muted = false; P3.v.errors = 0; P3.v.heard = "";
+  $("#voice-bar").classList.remove("hidden");
+  $("#voice").classList.add("on");
+  // anything already said for a running task is not read out again
+  for (const t of S.tasks.values()) P3.v.done.add(t.id);
+  if (S.state && S.state.current) P3.v.done.delete(S.state.current.id);
+  P3.paintVoice();
+  P3.listen();
+};
+P3.endVoice = function () {
+  if (!P3.v.mode) return;
+  P3.v.mode = false;
+  clearTimeout(P3.v.silence);
+  if (P3.v.recFor === "voice") P3.stopRec();
+  P3.shush();
+  $("#voice-bar").classList.add("hidden");
+  $("#voice").classList.remove("on");
+};
+P3.listen = function () {
+  if (!P3.v.mode || P3.v.muted || P3.v.speaking || P3.v.rec) { P3.paintVoice(); return; }
+  P3.startRec("voice");
+  P3.paintVoice();
+};
+P3.toggleMute = function () {
+  if (!P3.v.mode) return;
+  P3.v.muted = !P3.v.muted;
+  if (P3.v.muted) { P3.stopRec(); clearTimeout(P3.v.silence); } else P3.listen();
+  P3.paintVoice();
+};
+P3.voiceHeard = function (fin, mid) {
+  if (fin) P3.v.heard = (P3.v.heard + " " + fin).trim();
+  $("#vb-heard").textContent = (P3.v.heard + " " + mid).trim() || "Say something...";
+  clearTimeout(P3.v.silence);
+  // you stopped talking for a moment: send what you said
+  P3.v.silence = setTimeout(P3.voiceSend, mid ? 2200 : 1300);
+};
+P3.voiceSend = async function () {
+  const text = P3.v.heard.trim();
+  P3.v.heard = "";
+  if (!text || !P3.v.mode) return;
+  const low = text.toLowerCase().replace(/[.!?]/g, "").trim();
+  if (["stop talking", "be quiet", "shut up", "stop"].includes(low)) { P3.shush(); P3.paintVoice(); return; }
+  if (["end voice", "end voice mode", "goodbye", "bye"].includes(low)) { P3.endVoice(); return; }
+  $("#vb-heard").textContent = text;
+  await send(text, "voice");
+  P3.paintVoice();
+};
+P3.paintVoice = function () {
+  if (!$("#voice-bar")) return;
+  const running = !!(S.state && S.state.current);
+  const state = P3.v.muted ? "muted" : P3.v.speaking ? "talking" : running ? "thinking" : "listening";
+  $("#vb-orb").className = "vb-orb " + state;
+  $("#vb-state").textContent = { muted: "Mic muted", talking: "Talking", thinking: running && !P3.v.muted ? "Working on it (you can still talk)" : "Working on it", listening: "Listening" }[state];
+  $("#vb-mute").textContent = P3.v.muted ? "Unmute mic" : "Mute mic";
+  $("#vb-mute").classList.toggle("on", P3.v.muted);
+  $("#vb-skip").classList.toggle("hidden", !P3.v.speaking);
+};
+
+/* ---- reading answers out loud, sentence by sentence while they stream in */
+P3.readOn = () => { const r = (S.state && S.state.settings && S.state.settings.voice_read) || "voice_mode"; return r === "always" || (r === "voice_mode" && P3.v.mode); };
+P3.speakable = function (text) {
+  let t = String(text || "");
+  t = t.replace(/```[\s\S]*?```/g, " I put the code on the screen. ").replace(/```[\s\S]*$/g, " ");
+  t = t.split("\n").filter((l) => !/^\s*\|/.test(l)).join("\n");                     // tables: on screen only
+  t = t.replace(/!\[[^\]]*\]\([^)]*\)/g, "").replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/https?:\/\/\S+/g, "a link");
+  t = t.replace(/`([^`]*)`/g, "$1").replace(/[*_#>~]+/g, "").replace(/^\s*[-+]\s+/gm, "").replace(/^\s*(\d+)\.\s+/gm, "$1, ");
+  t = t.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, "");
+  return t.replace(/[ \t]+/g, " ").trim();
+};
+P3.nextSentences = function (id, final) {
+  // complete sentences that haven't been said yet (code blocks are skipped until they close)
+  const all = P3.v.streamed.get(id) || "";
+  const from = P3.v.spoken.get(id) || 0;
+  let rest = all.slice(from);
+  const fences = (all.slice(0, from).match(/```/g) || []).length;
+  if (fences % 2 === 1) {                                   // inside a code block: wait for it to close
+    const close = rest.indexOf("```");
+    if (close < 0) return "";
+    P3.v.spoken.set(id, from + close + 3);
+    return P3.nextSentences(id, final);
+  }
+  let cut = -1;
+  const open = rest.indexOf("```");
+  const scan = open >= 0 ? rest.slice(0, open) : rest;
+  const re = /[.!?:](\s|$)|\n\n|\n(?=\s*(\d+\.|[-*])\s)/g;
+  let m;
+  while ((m = re.exec(scan))) cut = m.index + m[0].length;
+  if (final) cut = rest.length;
+  else if (open >= 0 && cut < 0 && scan.trim()) cut = open;
+  if (cut <= 0) return "";
+  P3.v.spoken.set(id, from + cut);
+  return rest.slice(0, cut);
+};
+P3.onDelta = function (ev) {
+  if (!P3.readOn() || P3.v.done.has(ev.task)) return;
+  P3.v.streamed.set(ev.task, (P3.v.streamed.get(ev.task) || "") + ev.text);
+  const say = P3.nextSentences(ev.task, false);
+  if (say) P3.say(say);
+};
+P3.onTask = function (t) {
+  if (P3.v.mode) P3.paintVoice();
+  if (t.status === "running" || P3.v.done.has(t.id)) return;
+  P3.v.done.add(t.id);
+  if (!P3.readOn()) return;
+  if (P3.v.streamed.has(t.id)) {
+    const rest = P3.nextSentences(t.id, true);
+    if (rest) P3.say(rest);
+  } else if (t.final_text) P3.say(t.final_text);
+  if (t.error && t.status !== "done") P3.say("Something went wrong. " + t.error.split(/[.(]/)[0] + ".");
+  P3.v.streamed.delete(t.id); P3.v.spoken.delete(t.id);
+};
+
+P3.voices = () => (window.speechSynthesis ? speechSynthesis.getVoices() : []);
+P3.pickVoice = function () {
+  const all = P3.voices();
+  if (!all.length) return null;
+  const want = (S.state && S.state.settings && S.state.settings.voice_name) || "";
+  if (want) { const v = all.find((x) => x.name === want); if (v) return v; }
+  const lang = (navigator.language || "en-US").toLowerCase();
+  const score = (v) => (/natural/i.test(v.name) ? 4 : 0) + (/online/i.test(v.name) ? 1 : 0) +
+    (v.lang.toLowerCase() === lang ? 3 : v.lang.toLowerCase().startsWith(lang.slice(0, 2)) ? 2 : 0) + (v.localService ? 0 : 0.5);
+  return all.slice().sort((a, b) => score(b) - score(a))[0];
+};
+P3.tone = function (sentence) {
+  const s = (S.state && S.state.settings) || {};
+  let rate = Number(s.voice_rate || 1), pitch = Number(s.voice_pitch || 1);
+  if (s.voice_moods !== false && P3.moodTone) { const m = P3.moodTone(); rate *= m.rate; pitch *= m.pitch; }
+  if (/!\s*$/.test(sentence)) rate *= 1.05;                 // excited line: a bit faster
+  if (/\?\s*$/.test(sentence)) pitch *= 1.04;               // a question goes up a little
+  return { rate: Math.max(0.5, Math.min(2, rate)), pitch: Math.max(0.5, Math.min(1.6, pitch)) };
+};
+P3.say = function (text) {
+  if (!window.speechSynthesis) return;
+  const clean = P3.speakable(text);
+  if (!clean) return;
+  const parts = clean.match(/[^.!?\n]+[.!?]*|\n+/g) || [clean];
+  for (const p of parts) if (p.trim()) P3.v.q.push(p.trim());
+  P3.pump();
+};
+P3.pump = function () {
+  if (P3.v.current || !P3.v.q.length) {
+    if (!P3.v.current && !P3.v.q.length && P3.v.speaking) { P3.v.speaking = false; P3.paintVoice(); setTimeout(P3.listen, 350); }
+    return;
+  }
+  const line = P3.v.q.shift();
+  const u = new SpeechSynthesisUtterance(line);
+  const v = P3.pickVoice();
+  if (v) { u.voice = v; u.lang = v.lang; }
+  const t = P3.tone(line);
+  u.rate = t.rate; u.pitch = t.pitch;
+  const next = () => { if (P3.v.current === u) { P3.v.current = null; P3.pump(); } };
+  u.onend = next; u.onerror = next;
+  if (!P3.v.speaking) {
+    P3.v.speaking = true;
+    // don't listen to itself: the mic pauses while it talks (words you already said still get sent)
+    if (P3.v.recFor === "voice") P3.stopRec();
+    P3.paintVoice();
+  }
+  P3.v.current = u;
+  speechSynthesis.speak(u);
+};
+P3.shush = function () {
+  P3.v.q = [];
+  P3.v.current = null;
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  if (P3.v.speaking) { P3.v.speaking = false; P3.paintVoice(); setTimeout(P3.listen, 250); }
 };

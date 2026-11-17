@@ -83,6 +83,12 @@ def script(req: dict, fake: FakeClaude):
     i = turn_index(req)
     everything = json.dumps(req.get("messages", [])).lower()
     building = "MODE: BUILD" in system_text(req) or "mode: build" in everything
+    if "scary" in ask and not building:
+        return [X("Okay, the scary version: the lights went out, and the engine kept running by itself.")] if i == 0 else [X("Done.")]
+    if "story" in ask and not building:
+        # a slow answer (so you can talk to it while it works)
+        return ("delay", 8, [X("Here's a short story. A street racer found an old car in a barn. It still ran! "
+                               "He drove it all night and won the race at sunrise.")]) if i == 0 else [X("Done.")]
     if "remember" in ask and not building:
         # Piece 3: memory saves + tells you (Undo)
         steps = [

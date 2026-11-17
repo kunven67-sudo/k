@@ -48,6 +48,11 @@ DEFAULTS: dict[str, Any] = {
     "copy_numbers": True,        # numbered copy buttons on every answer piece (window only)
     # Piece 3
     "memory_save": "tell",       # tell = normal things save + tell you (Undo); ask = every save asks first
+    "voice_name": "",            # "" = the best natural voice Edge has
+    "voice_rate": 1.0,           # talking speed
+    "voice_pitch": 1.0,
+    "voice_read": "voice_mode",  # read answers out loud: voice_mode (only in voice mode) / always / off
+    "voice_moods": True,         # its voice follows its mood (a bit faster when excited, slower when sad)
 }
 
 _SCHEMA: dict[str, tuple] = {
@@ -71,6 +76,11 @@ _SCHEMA: dict[str, tuple] = {
     "own_ideas": (bool, None, "Its own ideas"),
     "copy_numbers": (bool, None, "Copy buttons on answers"),
     "memory_save": (str, lambda v: v in ("tell", "ask"), "Memory saving"),
+    "voice_name": (str, lambda v: len(v) <= 200, "Voice"),
+    "voice_rate": ((int, float), lambda v: 0.5 <= v <= 2.0, "Talking speed"),
+    "voice_pitch": ((int, float), lambda v: 0.5 <= v <= 1.6, "Voice pitch"),
+    "voice_read": (str, lambda v: v in ("voice_mode", "always", "off"), "Read answers out loud"),
+    "voice_moods": (bool, None, "Voice follows its mood"),
 }
 
 

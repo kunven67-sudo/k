@@ -258,6 +258,70 @@ function start(port, ...extra) {
     await page.waitForSelector(".mem-empty", { timeout: 5000 });
     await page.uncheck("#mem-arch");
     await page.click("#nav [data-tab=chat]");
+
+    // ---- Piece 3, part 2: voice (a fake microphone + fake voices, so it runs anywhere)
+    const vp = await ctx.newPage();
+    await vp.addInitScript(() => {
+      window.__spoken = []; window.__voices = [];
+      class FakeRec {
+        constructor() { window.__rec = this; }
+        start() { window.__recOn = true; window.__recStarts = (window.__recStarts || 0) + 1; }
+        stop() { this.abort(); }
+        abort() { window.__recOn = false; setTimeout(() => this.onend && this.onend(), 0); }
+      }
+      window.SpeechRecognition = FakeRec; window.webkitSpeechRecognition = FakeRec;
+      window.__say = (text, final = true) => { const r = window.__rec; r.onresult({ resultIndex: 0, results: [Object.assign([{ transcript: text }], { isFinal: final })] }); };
+      const voices = [{ name: "Microsoft David - English (United States)", lang: "en-US", localService: true },
+        { name: "Microsoft Guy Online (Natural) - English (United States)", lang: "en-US", localService: false }];
+      const synth = { speak(u) { window.__spoken.push(u.text); window.__voices.push(u.voice && u.voice.name); setTimeout(() => u.onend && u.onend(), 20); },
+        cancel() {}, getVoices() { return voices; }, onvoiceschanged: null };
+      Object.defineProperty(window, "speechSynthesis", { value: synth, configurable: true });
+      window.SpeechSynthesisUtterance = function (t) { this.text = t; };
+    });
+    await vp.goto(url);
+    await vp.waitForSelector("#brain-text:has-text('signed in')", { timeout: 20000 });
+    await vp.click("#new-chat");
+    await vp.click("#mic");
+    await vp.waitForFunction(() => window.__recOn === true);
+    await vp.evaluate(() => { window.__say("make the car", false); });
+    assert((await vp.inputValue("#msg")) === "make the car", "interim words show while talking");
+    await vp.evaluate(() => { window.__say("make the car faster"); });
+    assert((await vp.inputValue("#msg")) === "make the car faster", "final words typed in");
+    await vp.click("#mic");
+    assert(!(await vp.evaluate(() => window.__recOn)), "mic off");
+    await vp.fill("#msg", "");
+    await vp.keyboard.press("Control+Shift+Space");
+    await vp.waitForSelector("#voice-bar:not(.hidden) .vb-orb.listening", { timeout: 3000 });
+    await vp.evaluate(() => window.__say("what time is it"));
+    await vp.waitForSelector(".turn .me >> text=what time is it", { timeout: 6000 });
+    await vp.waitForFunction(() => window.__spoken.join(" ").includes("434"), null, { timeout: 30000 });
+    const said = await vp.evaluate(() => window.__spoken.join(" | "));
+    assert(!said.includes("**") && !said.includes("##"), "no markdown read out loud: " + said);
+    assert((await vp.evaluate(() => window.__voices[0])).includes("Natural"), "picks the natural voice");
+    await vp.waitForSelector(".vb-orb.listening", { timeout: 5000 });      // listens again after talking
+    await vp.evaluate(() => window.__say("tell me a story"));
+    await vp.waitForSelector(".turn .me >> text=tell me a story", { timeout: 6000 });
+    await vp.waitForSelector(".vb-orb.thinking", { timeout: 5000 });
+    await vp.evaluate(() => window.__say("make it scary"));
+    try { await vp.waitForSelector("#queue-box .qi >> text=make it scary", { timeout: 6000 }); }
+    catch (e) { console.log("DEBUG", await vp.evaluate(() => JSON.stringify({ q: S.state.queue, cur: !!S.state.current, heard: P3.v.heard, mode: P3.v.mode, toasts: Array.from(document.querySelectorAll(".toast")).map((t) => t.textContent), turns: Array.from(document.querySelectorAll(".turn .me")).map((t) => t.textContent) }))); throw e; }
+    await shot(vp, "15-voice-mode.png");
+    await vp.waitForSelector(".turn .me >> text=make it scary", { timeout: 30000 });
+    await vp.waitForFunction(() => window.__spoken.join(" ").includes("lights went out"), null, { timeout: 30000 });
+    assert(await vp.isHidden("#queue-box"), "queue empties");
+    await vp.click("#vb-mute");
+    await vp.waitForSelector(".vb-orb.muted", { timeout: 3000 });
+    assert(!(await vp.evaluate(() => window.__recOn)), "muted = not listening");
+    await vp.click("#vb-end");
+    assert(await vp.isHidden("#voice-bar"), "voice mode ends");
+    await vp.click("#nav [data-tab=settings]");
+    await vp.waitForSelector("[data-k=voice_name] >> text=Guy Online", { state: "attached", timeout: 5000 });
+    await vp.click("#voice-test");
+    await vp.waitForFunction(() => window.__spoken.join(" ").includes("how I sound"));
+    await vp.fill("[data-k=voice_rate]", "1.3");
+    await vp.click("#save-settings");
+    await vp.waitForSelector("#set-msg:has-text('Saved')", { timeout: 5000 });
+    await vp.close();
   } catch (e) {
     errors.push(String(e && e.stack || e));
   } finally {

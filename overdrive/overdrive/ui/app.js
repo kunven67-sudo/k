@@ -226,6 +226,7 @@ function handle(ev) {
     case "delta": {
       S.live.set(ev.task, (S.live.get(ev.task) || "") + ev.text);
       paintLive(ev.task);
+      P3.onDelta(ev);
       break;
     }
     case "card_open": S.cards.set(ev.card.id, ev.card); renderCards(); break;
@@ -382,6 +383,7 @@ function upsertTask(t) {
   }
   updateRunning();
   if (t.status !== "running" && S.tab === "status") loadStatus();
+  P3.onTask(t);
 }
 
 function renderFeed() {
@@ -602,17 +604,18 @@ function beep() {
 }
 
 /* ---------------------------------------------------------------- sending + stop */
-async function send(text) {
+async function send(text, source) {
   text = (text || "").trim();
   if (!text) return;
   if (await copyCommand(text)) return;
   if (S.setup && !S.setup.ready) { $("#setup").classList.remove("hidden"); renderSetup(); return; }
   $("#send").disabled = true;
   try {
-    const d = await api("/api/send", { text, conversation: S.conv, mode: S.conv ? undefined : (S.nextMode || "chat") });
+    // queue: if it's still working, the message waits and goes in right after (Piece 3)
+    const d = await api("/api/send", { text, conversation: S.conv, mode: S.conv ? undefined : (S.nextMode || "chat"), queue: true, source: source || "typed" });
     S.nextMode = null;
-    $("#msg").value = "";
-    autoGrow();
+    if (source !== "voice") { $("#msg").value = ""; autoGrow(); }
+    if (d.queued) { P3.queued(d.queued); $("#send").disabled = false; return; }
     if (S.conv !== d.task.conversation) { S.conv = d.task.conversation; S.tasks = new Map(); renderFeed(); }
     $("#chat-title").textContent = (S.state.conversations.find((c) => c.id === S.conv) || {}).title || d.task.request.slice(0, 60);
     upsertTask(d.task);
@@ -623,8 +626,8 @@ async function send(text) {
 function updateRunning() {
   const running = !!(S.state && S.state.current);
   $("#stop").classList.toggle("hidden", !running);
-  $("#send").disabled = running;
-  $("#msg").placeholder = running ? "OVERDRIVE is working... (press STOP to end it)" : "Tell OVERDRIVE what to do...";
+  $("#send").disabled = false;
+  $("#msg").placeholder = running ? "It's working... you can still type: it goes in right after this step" : "Tell OVERDRIVE what to do...";
   renderBrain();
 }
 
@@ -999,6 +1002,7 @@ async function saveSettings() {
     const k = el.dataset.k;
     let v = el.type === "checkbox" ? el.checked : el.value;
     if (el.type === "number") v = k.endsWith("_usd") ? Number(v) : parseInt(v, 10);
+    if (el.type === "range") v = Number(v);
     if (JSON.stringify(v) !== JSON.stringify(s[k])) changes[k] = v;
   });
   const perms = {};

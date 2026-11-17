@@ -211,3 +211,77 @@ def test_memory_pack_first_start():
         assert od.auto_import_packs() == [] and od.memory.count() == n        # same pack: never twice
         od2 = Overdrive(home=home, test_env={"X": "1"})
         assert od2.auto_import_packs() == []                                 # also after a restart
+
+
+# ================================================================ Part 2: talking to it while it works
+@covers(84, 100, cli=True, title="A message sent while it works waits, then goes in right after (STOP pauses it)")
+def test_e2e_queue_while_busy():
+    import asyncio
+    import time as _time
+    asked = []
+
+    def go(tmp, fake):
+        od = make_agent(tmp, fake, mode="chat")
+
+        def script(req, f):
+            if not is_overdrive_main(req):
+                return [X("ok")]
+            users = [m for m in req.get("messages", []) if m.get("role") == "user"]
+            last = str(users[-1].get("content")) if users else ""
+            asked.append(last)
+            if "slow one" in last:
+                return ("delay", 2.5, [X("Working on the slow one. Here is a long answer about it, word by word.")])
+            return [X("Got your second message.")]
+        fake.script = script
+
+        async def main():
+            od.events.bind_loop(asyncio.get_running_loop())
+            first = await od.send("do the slow one")
+            await asyncio.sleep(0.3)
+            item = od.enqueue("also make it red", source="voice")
+            assert item["conversation"] == first.conversation and od.queue, od.queue
+            deadline = _time.monotonic() + 120
+            while (od.current is not None or od.queue) and _time.monotonic() < deadline:
+                await asyncio.sleep(0.1)
+            await asyncio.sleep(0.5)
+            tasks = [od.task_store.load(t) for t in od.conversations[first.conversation].tasks]
+            assert len(tasks) == 2, [t.request for t in tasks]
+            assert tasks[1].request.startswith("(I said this while you were working") and "make it red" in tasks[1].request
+            assert all(t.status == "done" for t in tasks), [(t.status, t.status_reason) for t in tasks]
+            # STOP pauses the queue: the waiting message stays until "Send now"
+            await od.send("do the slow one again", first.conversation)
+            await asyncio.sleep(0.3)
+            od.enqueue("and blue", first.conversation)
+            await od.stop()
+            while od.current is not None:
+                await asyncio.sleep(0.1)
+            await asyncio.sleep(1.2)
+            assert od.current is None and len(od.queue) == 1, (od.current, od.queue)
+            await od.send_queued(od.queue[0]["id"])
+            while od.current is not None:
+                await asyncio.sleep(0.1)
+            assert not od.queue and len(od.conversations[first.conversation].tasks) == 4
+            od.enqueue("x", first.conversation)            # idle: it goes in right away
+            od.queue.clear()
+            try:
+                od.unqueue("q-none")
+                raise AssertionError("removing a missing message should fail")
+            except ValueError:
+                pass
+        asyncio.run(main())
+    with_fake(lambda r, f: [X("ok")], go)
+
+
+@covers(53, title="Voice settings are checked (speed, pitch, when to read out loud)")
+def test_voice_settings():
+    from ..settings import Settings, SettingsError
+    with TempDir() as tmp:
+        s = Settings(tmp)
+        s.update({"voice_rate": 1.25, "voice_pitch": 0.9, "voice_read": "always", "voice_name": "Microsoft Guy Online (Natural)"})
+        assert s.get("voice_rate") == 1.25 and s.get("voice_read") == "always"
+        for bad in ({"voice_rate": 5}, {"voice_read": "sometimes"}, {"voice_pitch": "high"}):
+            try:
+                s.update(bad)
+                raise AssertionError(f"should refuse {bad}")
+            except SettingsError:
+                pass

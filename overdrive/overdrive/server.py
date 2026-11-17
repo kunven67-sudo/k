@@ -111,6 +111,7 @@ class Server:
             "removed_env": od.removed_env,
             "home": str(od.paths.home),
             "notes": list(od.startup_notes),
+            "queue": list(od.queue),
             "memory_counts": od.memory.counts(),
         }
 
@@ -130,6 +131,7 @@ class Server:
             ("/api/chat/rename", self.chat_rename, ["POST"]), ("/api/chat/delete", self.chat_delete, ["POST"]),
             ("/api/chat/search", self.chat_search, ["GET"]), ("/api/open", self.open, ["POST"]), ("/api/quit", self.quit, ["POST"]),
             # Piece 3: memory page
+            ("/api/queue", self.queue_action, ["POST"]),
             ("/api/memory", self.memory_page, ["GET"]), ("/api/memory/edit", self.memory_edit, ["POST"]),
             ("/api/memory/set", self.memory_set, ["POST"]), ("/api/memory/forget", self.memory_forget, ["POST"]),
             ("/api/memory/import", self.memory_import, ["POST"]), ("/api/memory/undo", self.memory_undo, ["POST"]),
@@ -223,10 +225,31 @@ class Server:
             rec = await self.od.send(str(body.get("text", "")), body.get("conversation") or None,
                                      mode=body.get("mode") if body.get("mode") in ("chat", "build") else None)
         except Busy as e:
+            if body.get("queue"):
+                try:
+                    item = self.od.enqueue(str(body.get("text", "")), body.get("conversation") or None,
+                                           source=str(body.get("source") or "typed"))
+                except ValueError as e2:
+                    return JSONResponse({"error": str(e2)}, 400)
+                return JSONResponse({"queued": item})
             return JSONResponse({"error": str(e)}, 409)
         except ValueError as e:
             return JSONResponse({"error": str(e)}, 400)
         return JSONResponse({"task": rec.public()})
+
+    async def queue_action(self, request: Request) -> Response:
+        b = await self._json(request)
+        qid, action = str(b.get("id") or ""), str(b.get("action") or "")
+        try:
+            if action == "remove":
+                self.od.unqueue(qid)
+            elif action == "send":
+                await self.od.send_queued(qid)
+            else:
+                return JSONResponse({"error": "unknown action"}, 400)
+        except (ValueError, Busy) as e:
+            return JSONResponse({"error": str(e)}, 400)
+        return JSONResponse({"queue": self.od.queue})
 
     async def mode(self, request: Request) -> Response:
         body = await self._json(request)
@@ -516,9 +539,21 @@ def _docs_dir() -> Path:
 
 
 # ---------------------------------------------------------------------- running
+DEFAULT_PORT = 47311   # the same address every start, so Edge remembers your "Allow microphone" answer
+
+
 def _bind() -> socket.socket:
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(("127.0.0.1", int(os.environ.get("OVERDRIVE_PORT", "0") or 0)))
+    want = os.environ.get("OVERDRIVE_PORT", "").strip()
+    if want:
+        s.bind(("127.0.0.1", int(want or 0)))
+    else:
+        try:
+            s.bind(("127.0.0.1", DEFAULT_PORT))
+        except OSError:                       # taken by something else: any free port still works
+            s.close()
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.bind(("127.0.0.1", 0))
     s.listen(64)
     s.setblocking(False)
     return s
