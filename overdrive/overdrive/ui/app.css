@@ -521,3 +521,60 @@ button.xs:hover { color: var(--text); border-color: var(--line2); }
 .bn-ic.moon { background: #cdb0ff; border-radius: 0; -webkit-mask: var(--m) center / contain no-repeat; mask: var(--m) center / contain no-repeat; --m: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z' fill='black'/%3E%3C/svg%3E"); }
 .bn-x { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; padding: 0; border: 0; background: transparent; color: var(--faint); font-size: 18px; line-height: 1; }
 .bn-x:hover { color: var(--text); background: #262b35; }
+
+/* ---------------------------------------------------------------- Piece 3: schedule, accounts, internet, done chats, tour */
+.ic-clock { --m: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='8.5' fill='none' stroke='black' stroke-width='2'/%3E%3Cpath d='M12 7.5V12l3 2' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E"); }
+.ic-user { --m: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='black'/%3E%3Cpath d='M4 21a8 8 0 0 1 16 0z' fill='black'/%3E%3C/svg%3E"); }
+.side-row { display: flex; gap: 6px; margin: 6px 0 8px; }
+.net-light, .acct-chip { display: inline-flex; align-items: center; gap: 7px; padding: 3px 9px; font-size: 12px; border-radius: 20px; background: #0f1115; border: 1px solid var(--line); color: var(--muted); }
+.acct-chip .ic { width: 12px; height: 12px; }
+.acct-chip { max-width: 120px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.nl-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); flex: none; }
+.net-light.up .nl-dot { background: var(--ok); box-shadow: 0 0 8px rgba(63, 185, 80, .8); }
+.net-light.down { color: #ff8b84; border-color: rgba(248, 81, 73, .5); }
+.net-light.down .nl-dot { background: var(--bad); animation: pulse 1s infinite; }
+.banner.net.down { border-color: rgba(248, 81, 73, .6); background: repeating-linear-gradient(0deg, rgba(255, 255, 255, .025) 0 1px, transparent 1px 3px), radial-gradient(140% 200% at 0% 50%, rgba(248, 81, 73, .18), transparent 60%), var(--panel); }
+.banner.net.up { border-color: rgba(63, 185, 80, .55); background: radial-gradient(140% 200% at 0% 50%, rgba(63, 185, 80, .14), transparent 60%), var(--panel); }
+.sig { display: flex; align-items: flex-end; gap: 3px; height: 22px; flex: none; }
+.sig i { width: 5px; background: var(--bad); border-radius: 2px; opacity: .25; }
+.sig i:nth-child(1) { height: 25%; opacity: 1; animation: sigdie 1.2s infinite; }
+.sig i:nth-child(2) { height: 50%; } .sig i:nth-child(3) { height: 75%; } .sig i:nth-child(4) { height: 100%; }
+.sig.back i { background: var(--ok); opacity: 1; animation: sigup .6s ease-out backwards; }
+.sig.back i:nth-child(2) { animation-delay: .1s; } .sig.back i:nth-child(3) { animation-delay: .2s; } .sig.back i:nth-child(4) { animation-delay: .3s; }
+@keyframes sigdie { 50% { opacity: .2; } }
+@keyframes sigup { from { transform: scaleY(0); transform-origin: bottom; } }
+.glitch { position: relative; letter-spacing: .12em; color: #ff8b84; }
+.glitch::before, .glitch::after { content: attr(data-text); position: absolute; left: 0; top: 0; overflow: hidden; }
+.glitch::before { color: #58a6ff; clip-path: inset(0 0 55% 0); animation: gl1 2.4s infinite steps(1); }
+.glitch::after { color: #ff6a2b; clip-path: inset(55% 0 0 0); animation: gl2 2.4s infinite steps(1); }
+@keyframes gl1 { 0%, 86%, 100% { transform: none; } 88% { transform: translate(-2px, -1px); } 92% { transform: translate(2px, 0); } }
+@keyframes gl2 { 0%, 84%, 100% { transform: none; } 86% { transform: translate(2px, 1px); } 90% { transform: translate(-2px, 0); } }
+.done-head { display: flex; align-items: center; gap: 6px; width: calc(100% - 12px); margin: 8px 6px 2px; background: transparent; border: 0; color: var(--faint); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; padding: 4px 6px; }
+.done-head .tri { width: 0; height: 0; border-left: 5px solid currentColor; border-top: 4px solid transparent; border-bottom: 4px solid transparent; transition: transform .15s; }
+.done-head.open .tri { transform: rotate(90deg); }
+.chat-row.is-done .chat-item { color: var(--faint); }
+.accts { display: flex; flex-direction: column; gap: 8px; margin: 12px 0 18px; }
+.acct { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.acct.on { border-color: rgba(63, 185, 80, .55); }
+.on-chip { color: var(--ok); border-color: rgba(63, 185, 80, .5); }
+.sched-form { max-width: 900px; }
+.sched-form textarea { width: 100%; }
+.jobs { display: flex; flex-direction: column; gap: 8px; max-width: 900px; }
+.job { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 10px; padding: 10px 14px; }
+.job.off { border-left-color: var(--line2); opacity: .75; }
+.job-when { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.job-title { margin-top: 4px; font-size: 14px; }
+.job-text { font-size: 12.5px; margin-top: 2px; white-space: pre-wrap; }
+.tour { position: fixed; inset: 0; z-index: 90; }
+.tour-hole { position: fixed; border-radius: 12px; box-shadow: 0 0 0 9999px rgba(5, 6, 9, .72), 0 0 0 2px var(--accent), 0 0 24px rgba(255, 106, 43, .55); transition: all .28s ease; pointer-events: none; }
+.tour-card { position: fixed; width: 330px; background: var(--panel2); border: 1px solid var(--accent); border-radius: 14px; padding: 16px 18px; box-shadow: 0 18px 50px rgba(0, 0, 0, .55); transition: left .28s ease, top .28s ease; }
+.tour-card.center { left: 50% !important; top: 50% !important; transform: translate(-50%, -50%); width: 420px; box-shadow: 0 0 0 9999px rgba(5, 6, 9, .72), 0 18px 50px rgba(0, 0, 0, .55); }
+.tour-card h3 { margin: 2px 0 6px; font-size: 16px; }
+.tour-card p { margin: 0 0 12px; color: var(--muted); }
+.tour-card textarea { width: 100%; margin-bottom: 10px; }
+.tour-n { font-size: 11.5px; }
+.banner > .sig, .banner > .bn-ic { flex: none; }
+.me-auto { text-align: right; color: var(--faint); font-size: 12.5px; margin: 4px 2px 8px; }
+.me-auto details { display: inline-block; text-align: left; }
+.me-auto summary { cursor: pointer; }
+.me-auto pre { white-space: pre-wrap; max-width: 640px; color: var(--muted); font-size: 12px; }

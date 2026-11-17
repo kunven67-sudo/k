@@ -11,6 +11,10 @@ P3.state = function (st) {
   P3.paintMemCount(st.memory_counts);
   P3.renderQueue(st.queue);
   P3.paintAwayChip(st.away);
+  P3.paintNet(st.net);
+  P3.paintAccount(st.accounts);
+  $("#nav-jobs").textContent = st.jobs ? String(st.jobs) : "";
+  if (!st.tour_done && !P3.toured) { P3.toured = true; setTimeout(() => { if ($("#setup").classList.contains("hidden")) P3.startTour(); }, 900); }
   const last = st.away && (st.away.reports || []).slice(-1)[0];
   if (last && !last.seen) P3.awayReport(last);
   const notes = st.notes || [];
@@ -32,6 +36,14 @@ P3.event = function (ev) {
     case "queue": if (S.state) S.state.queue = ev.queue; P3.renderQueue(ev.queue); break;
     case "away": P3.paintAwayChip(ev.away); if (S.tab === "away") P3.loadAway(); break;
     case "away_report": P3.awayReport(ev.report); if (S.tab === "away") P3.loadAway(); break;
+    case "net": if (S.state) S.state.net = ev.net; P3.paintNet(ev.net); break;
+    case "accounts": P3.paintAccount(ev.accounts); break;
+    case "limit_hit": P3.limitHit(ev); break;
+    case "schedule": if (S.tab === "schedule" && !P3.sched.editing) P3.loadSchedule(); else $("#nav-jobs").textContent = (ev.jobs || []).filter((j) => j.enabled).length || ""; break;
+    case "chats_done_ask":
+      P3.banner("chatsdone", `<span class="bn-ic"></span><div>${ev.chats.length} old chat${ev.chats.length === 1 ? "" : "s"} nobody used for a while: <b>${ev.chats.slice(0, 3).map((c) => esc(c.title)).join(", ")}${ev.chats.length > 3 ? "..." : ""}</b>. Move ${ev.chats.length === 1 ? "it" : "them"} to the Done folder?</div>
+        <button class="ghost sm" data-chats-done="${esc(ev.chats.map((c) => c.id).join(","))}">Yes, move ${ev.chats.length === 1 ? "it" : "them"}</button>`);
+      break;
     case "projects_done": P3.askDone(ev.ask); if (ev.marked && ev.marked.length) toast(`Marked done (nobody touched them): ${ev.marked.join(", ")}`, "ok", 8000); break;
     default: break;
   }
@@ -39,6 +51,7 @@ P3.event = function (ev) {
 
 P3.tab = function (tab) {
   if (tab === "memory") P3.loadMemory();
+  if (tab === "schedule") P3.loadSchedule();
   if (tab === "away") P3.loadAway();
 };
 
@@ -76,7 +89,8 @@ P3.settingsHtml = function (s, opt, sw, num) {
       <div class="row2"><label>Saving to memory</label><select data-k="memory_save">${opt("tell", "Saves normal things and tells me (Undo button)", s.memory_save)}${opt("ask", "Always ask me first", s.memory_save)}</select></div>
       <div class="hint row2"><span></span><span class="hint">Personal things (health, money, family, love life, feelings) and new rules ALWAYS ask first, whatever this says. The same thing is never saved twice.</span></div>
       <div class="btns"><button type="button" class="ghost" id="set-mem-open">Open the Memory page</button></div>
-    </div>`;
+    </div>
+    <div class="st-sec"><h3>Help</h3><div class="btns"><button type="button" class="ghost" id="set-tour">Show the tour again</button><button type="button" class="ghost" id="set-accts">Claude accounts</button></div></div>`;
 };
 
 P3.bind = function () {
@@ -86,6 +100,8 @@ P3.bind = function () {
   $("#mem-body").addEventListener("click", P3.memClick);
   $("#settings-body").addEventListener("click", (e) => {
     if (e.target.id === "set-mem-open") switchTab("memory");
+    if (e.target.id === "set-tour") P3.startTour();
+    if (e.target.id === "set-accts") P3.showAccounts();
     if (e.target.id === "voice-test") {
       const sel = $("[data-k=voice_name]"), rate = $("[data-k=voice_rate]"), pitch = $("[data-k=voice_pitch]");
       const keep = Object.assign({}, S.state.settings);
@@ -99,6 +115,12 @@ P3.bind = function () {
   $("#away-body").addEventListener("click", P3.awayClick);
   $("#away-body").addEventListener("change", P3.awayChange);
   $("#banners").addEventListener("click", P3.bannerClick);
+  $("#sched-body").addEventListener("click", P3.schedClick);
+  $("#acct-chip").addEventListener("click", P3.showAccounts);
+  $("#net-light").addEventListener("click", () => { const n = P3.net.last; toast(!n ? "Checking the internet..." : n.online ? "The internet is working." : "No internet right now. Claude can't think until it's back.", n && n.online === false ? "warn" : "ok", 4000); });
+  $("#drawer-body").addEventListener("click", P3.accountsClick);
+  $("#tour").addEventListener("click", P3.tourClick);
+  window.addEventListener("resize", () => { if (P3.tourAt >= 0) P3.paintTour(); });
   $("#learn-now").addEventListener("click", async () => {
     try { await api("/api/away/action", { action: "learn_now" }); toast("It's learning something now (in the \u201cWhile you were away\u201d chat).", "ok", 5000); P3.loadAway(); }
     catch (e) { toast(e.message, "bad"); }
@@ -693,6 +715,11 @@ P3.bannerClick = async function (e) {
   }
   const go = e.target.closest("[data-go]");
   if (go) switchTab(go.dataset.go);
+  const lu = e.target.closest("[data-limit-use]");
+  if (lu) { try { await api("/api/accounts/action", { action: "switch", name: lu.dataset.limitUse }); toast(`Now using the ${lu.dataset.limitUse} account. Send your message again.`, "ok", 6000); P3.banners.delete("limit"); P3.paintBanners(); checkSetup(true, true); } catch (err) { toast(err.message, "bad"); } return; }
+  if (e.target.closest("[data-acct-open]")) { P3.showAccounts(); return; }
+  const cd = e.target.closest("[data-chats-done]");
+  if (cd) { for (const id of cd.dataset.chatsDone.split(",")) { try { await api("/api/chat/done", { conversation: id, done: true }); const c = (S.state.conversations || []).find((x) => x.id === id); if (c) c.done = true; } catch (err) { /* deleted meanwhile */ } } P3.banners.delete("chatsdone"); P3.paintBanners(); renderChats(); return; }
   const pd = e.target.closest("[data-askdone]");
   if (pd) {
     const [name, yes] = [pd.dataset.askdone, pd.dataset.yes === "1"];
@@ -710,5 +737,208 @@ P3.askDone = function (names) {
   for (const n of names || []) {
     P3.banner("done:" + n, `<span class="bn-ic"></span><div>Is <b>${esc(n)}</b> done? Nobody touched it for a while. Done projects skip the bug hunt.</div>
       <button class="ghost sm" data-askdone="${esc(n)}" data-yes="1">Yes, it's done</button><button class="ghost sm" data-askdone="${esc(n)}" data-yes="0">Not done</button>`);
+  }
+};
+
+/* ================================================================ Part 4: schedule, accounts, internet, done chats, tour */
+P3.chatDone = async function (id, done) {
+  try {
+    const r = await api("/api/chat/done", { conversation: id, done });
+    const c = (S.state.conversations || []).find((x) => x.id === id);
+    if (c) Object.assign(c, r.conversation);
+    renderChats();
+    toast(done ? "Moved to the Done folder (bottom of the list)." : "Brought back.", "ok", 2500);
+  } catch (e) { toast(e.message, "bad"); }
+};
+
+/* ---- internet light: always there; a drop shows a banner that stays until you close it */
+P3.net = { last: null };
+P3.paintNet = function (n) {
+  if (!n) return;
+  const el = $("#net-light");
+  el.className = "net-light " + (n.online === false ? "down" : n.online ? "up" : "");
+  $("#net-text").textContent = n.online === false ? "No internet" : n.online ? "Internet" : "Checking...";
+  el.title = n.online === false ? `Internet down since ${new Date(n.since * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Internet is working";
+  const prev = P3.net.last;
+  P3.net.last = n;
+  if (prev && prev.online === true && n.online === false) {
+    P3.banner("net", `<div class="sig"><i></i><i></i><i></i><i></i></div><div><b class="glitch" data-text="SIGNAL LOST">SIGNAL LOST</b>
+      <div class="muted">Your internet dropped at ${new Date(n.since * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}. Claude can't think until it's back; the Tools page and the bug hunt still work.</div></div>`, "net down");
+  } else if (prev && prev.online === false && n.online === true && P3.banners.has("net")) {
+    const d = (n.drops || []).slice(-1)[0];
+    const mins = d && d.seconds != null ? (d.seconds < 90 ? `${d.seconds} seconds` : `${Math.round(d.seconds / 60)} minutes`) : "a bit";
+    P3.banner("net", `<div class="sig back"><i></i><i></i><i></i><i></i></div><div><b>BACK ONLINE</b>
+      <div class="muted">The internet came back at ${new Date(n.since * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} (it was out for ${mins}).</div></div>`, "net up");
+  }
+};
+
+/* ---- accounts: one click to switch, it never switches by itself */
+P3.paintAccount = function (a) { if (a) $("#acct-name").textContent = a.active; };
+P3.showAccounts = async function () {
+  $("#drawer-body").innerHTML = `<h2 style="margin-top:0">Claude accounts</h2><div class="loading">Checking sign-ins...</div>`;
+  $("#drawer").classList.remove("hidden");
+  let d;
+  try { d = await api("/api/accounts"); } catch (e) { $("#drawer-body").innerHTML = `<div class="err">${esc(e.message)}</div>`; return; }
+  P3.paintAccount(d);
+  $("#drawer-body").innerHTML = `<h2 style="margin-top:0">Claude accounts</h2>
+    <p class="muted">Each account has its own usage limits. When one runs out, OVERDRIVE tells you and you pick another here (one click). It never switches by itself: switching accounts automatically to dodge limits can get accounts banned. Chats keep going on the new account.</p>
+    <div class="accts">${d.accounts.map((a) => `<div class="acct${a.active ? " on" : ""}">
+      <div class="acct-main"><b>${esc(a.name)}</b>${a.main ? ` <span class="muted">(this PC's normal sign-in)</span>` : ""}
+        <div class="muted">${a.signed_in ? `signed in${a.email ? " as " + esc(a.email) : ""}` : "not signed in yet"}${a.note ? " &middot; " + esc(a.note) : ""}</div></div>
+      <div class="btns">${a.active ? `<span class="chip on-chip">in use</span>` : `<button class="primary sm" data-acct-use="${esc(a.name)}" ${a.signed_in ? "" : "disabled"}>Use this one</button>`}
+        <button class="ghost sm" data-acct-signin="${esc(a.name)}">${a.signed_in ? "Sign in again" : "Sign in"}</button>
+        ${a.main ? "" : `<button class="ghost sm danger-t" data-acct-del="${esc(a.name)}">Remove</button>`}</div></div>`).join("")}</div>
+    <h2>Add an account</h2><div class="imp-row"><input id="acct-new" placeholder="A name for it, like: second account" maxlength="40"><button class="primary" id="acct-add">Add + sign in</button></div>
+    <div class="muted" style="font-size:12.5px">A sign-in window opens: pick that claude.ai account in your browser and press Allow. Then come back here.</div>`;
+};
+P3.accountsClick = async function (e) {
+  const use = e.target.closest("[data-acct-use]"), si = e.target.closest("[data-acct-signin]"), del = e.target.closest("[data-acct-del]");
+  try {
+    if (use) { await api("/api/accounts/action", { action: "switch", name: use.dataset.acctUse }); toast(`Now using the ${use.dataset.acctUse} account.`, "ok"); P3.banners.delete("limit"); P3.paintBanners(); checkSetup(true, true); P3.showAccounts(); }
+    else if (si) { const r = await api("/api/accounts/action", { action: "signin", name: si.dataset.acctSignin }); toast(r.opened ? "Sign-in window opened. Press Allow in the browser, then come back." : r.note, r.opened ? "ok" : "warn", 9000); }
+    else if (del) { if (!confirm(`Remove the account "${del.dataset.acctDel}" from OVERDRIVE?`)) return; await api("/api/accounts/action", { action: "remove", name: del.dataset.acctDel }); P3.showAccounts(); }
+    else if (e.target.id === "acct-add") {
+      const name = $("#acct-new").value.trim();
+      if (!name) { toast("Give it a name first.", "warn"); return; }
+      const r = await api("/api/accounts/action", { action: "add", name });
+      toast(r.opened ? "Added. A sign-in window opened: press Allow in the browser." : `Added. ${r.note || ""}`, "ok", 9000);
+      P3.showAccounts();
+    }
+  } catch (err) { toast(err.message, "bad"); }
+};
+P3.limitHit = function (ev) {
+  const others = (ev.others || []).filter((n) => n !== ev.account);
+  if (S.tab !== "chat") toast(`Your ${ev.account} account's limit is used up. See the Chat page to pick another account.`, "warn", 10000);
+  const when = ev.resets_at ? new Date(ev.resets_at * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
+  P3.banner("limit", `<span class="bn-ic"></span><div><b>Your ${esc(ev.account)} account's limit is used up${when ? ` (it resets at ${esc(when)})` : ""}.</b>
+    <div class="muted">${others.length ? "Pick another account to keep going, or schedule it for after the reset." : "Add another account, or schedule it for after the reset."}</div></div>
+    ${others.map((n) => `<button class="primary sm" data-limit-use="${esc(n)}">Use ${esc(n)}</button>`).join("")}<button class="ghost sm" data-go="schedule">Schedule it</button>
+    ${others.length ? "" : `<button class="ghost sm" data-acct-open>Accounts</button>`}`, "limit");
+};
+
+/* ---- schedule page */
+P3.sched = { jobs: [], chats: [], editing: null };
+P3.loadSchedule = async function () {
+  try { const d = await api("/api/schedule"); P3.sched.jobs = d.jobs; P3.sched.chats = d.chats; } catch (e) { $("#sched-body").innerHTML = `<div class="err">${esc(e.message)}</div>`; return; }
+  P3.renderSchedule();
+};
+P3.localStamp = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+P3.whenText = function (j) {
+  if (j.when === "usage_reset") return "When my 5-hour usage resets";
+  const d = new Date(j.at);
+  const day = d.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
+  const t = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return j.repeat === "daily" ? `Every day at ${t}` : j.repeat === "weekly" ? `Every ${d.toLocaleDateString([], { weekday: "long" })} at ${t}` : `${day} at ${t}`;
+};
+P3.renderSchedule = function () {
+  const { jobs, chats, editing } = P3.sched;
+  const job = editing && editing !== "new" ? jobs.find((j) => j.id === editing) : null;
+  const pad = (n) => String(n).padStart(2, "0");
+  const soon = new Date(Date.now() + 3600e3);
+  const defAt = `${soon.getFullYear()}-${pad(soon.getMonth() + 1)}-${pad(soon.getDate())}T${pad(soon.getHours())}:00`;
+  const f = job || { title: "", text: "", when: "time", at: defAt, repeat: "once", mode: "chat", conversation: "", missed: "run" };
+  const form = editing ? `<div class="st-sec sched-form"><h3>${job ? "Change the job" : "New job"}</h3>
+      <div class="row2"><label>What it should do</label><textarea id="sj-text" rows="3" maxlength="8000" placeholder="Like: work on the racing game's night map and test it">${esc(f.text)}</textarea></div>
+      <div class="row2"><label>Name (optional)</label><input id="sj-title" maxlength="80" value="${esc(job ? f.title : "")}" placeholder="Night map"></div>
+      <div class="row2"><label>When</label><span class="inl"><select id="sj-when"><option value="time" ${f.when === "time" ? "selected" : ""}>At a day and time</option><option value="usage_reset" ${f.when === "usage_reset" ? "selected" : ""}>When my 5-hour usage resets</option></select>
+        <input type="datetime-local" id="sj-at" value="${esc(f.at || defAt)}" ${f.when === "time" ? "" : "disabled"}>
+        <select id="sj-repeat" ${f.when === "time" ? "" : "disabled"}>${[["once", "Just once"], ["daily", "Every day"], ["weekly", "Every week"]].map(([v, l]) => `<option value="${v}" ${f.repeat === v ? "selected" : ""}>${l}</option>`).join("")}</select></span></div>
+      <div class="row2"><label>Mode</label><select id="sj-mode"><option value="chat" ${f.mode === "chat" ? "selected" : ""}>Chat (talk, look things up, plan)</option><option value="build" ${f.mode === "build" ? "selected" : ""}>Build (make, run and test things)</option></select></div>
+      <div class="row2"><label>In which chat</label><select id="sj-conv"><option value="">A new chat</option>${chats.map((c) => `<option value="${esc(c.id)}" ${f.conversation === c.id ? "selected" : ""}>${esc(c.title)}</option>`).join("")}</select></div>
+      <div class="row2"><label>If the PC is off then</label><select id="sj-missed"><option value="run" ${f.missed === "run" ? "selected" : ""}>Do it when the PC is back</option><option value="skip" ${f.missed === "skip" ? "selected" : ""}>Skip that time</option></select></div>
+      <div class="btns"><button class="primary" id="sj-save">${job ? "Save" : "Add to schedule"}</button><button class="ghost" id="sj-cancel">Cancel</button></div></div>` : "";
+  const upcoming = jobs.filter((j) => j.enabled).sort((a, b) => (a.when === "time" ? a.at : "9") .localeCompare(b.when === "time" ? b.at : "9"));
+  const old = jobs.filter((j) => !j.enabled);
+  const row = (j) => `<div class="job${j.enabled ? "" : " off"}" data-job="${esc(j.id)}">
+      <div class="job-when"><b>${esc(P3.whenText(j))}</b><span class="chip">${j.mode === "build" ? "Build" : "Chat"}</span>${j.by && j.by.startsWith("OVERDRIVE") ? `<span class="chip">it suggested, you said Yes</span>` : ""}</div>
+      <div class="job-title">${esc(j.title)}</div>${j.text !== j.title ? `<div class="muted job-text">${esc(j.text.slice(0, 240))}</div>` : ""}
+      <div class="mr-foot"><span class="muted">${j.last_run ? "last ran " + esc(P3.ago(j.last_run)) : j.finished ? "done" : "hasn't run yet"}</span>
+        <span class="mr-acts"><button class="ghost xs" data-jact="run">Run now</button><button class="ghost xs" data-jact="edit">Change</button>
+        <button class="ghost xs" data-jact="toggle">${j.enabled ? "Pause" : "Turn on"}</button><button class="ghost xs danger-t" data-jact="delete">Delete</button></span></div></div>`;
+  $("#sched-body").innerHTML = `${editing ? form : `<div class="btns" style="margin-bottom:14px"><button class="primary" id="sj-new">+ New job</button>
+      <span class="muted">Or just tell it in a chat: “do this Friday at 3” or “build it when my usage resets”.</span></div>`}
+    ${upcoming.length ? `<div class="jobs">${upcoming.map(row).join("")}</div>` : (editing ? "" : `<div class="box muted">Nothing scheduled.</div>`)}
+    ${old.length ? `<h2>Paused or finished</h2><div class="jobs">${old.map(row).join("")}</div>` : ""}
+    <div class="muted" style="margin-top:16px;font-size:12.5px">Jobs run while OVERDRIVE is running. Turn on “Keep working when the window is closed” and “Start with Windows” on the While away page so they never get missed.</div>`;
+  $("#nav-jobs").textContent = upcoming.length ? String(upcoming.length) : "";
+  const whenSel = $("#sj-when");
+  if (whenSel) whenSel.addEventListener("change", () => { const t = whenSel.value === "time"; $("#sj-at").disabled = !t; $("#sj-repeat").disabled = !t; });
+};
+P3.schedClick = async function (e) {
+  const t = e.target;
+  if (t.id === "sj-new") { P3.sched.editing = "new"; P3.renderSchedule(); $("#sj-text").focus(); return; }
+  if (t.id === "sj-cancel") { P3.sched.editing = null; P3.renderSchedule(); return; }
+  if (t.id === "sj-save") {
+    const job = { text: $("#sj-text").value.trim(), title: $("#sj-title").value.trim(), when: $("#sj-when").value, at: $("#sj-at").value,
+      repeat: $("#sj-repeat").value, mode: $("#sj-mode").value, conversation: $("#sj-conv").value, missed: $("#sj-missed").value };
+    try {
+      if (P3.sched.editing === "new") await api("/api/schedule/action", { action: "add", job });
+      else await api("/api/schedule/action", { action: "update", id: P3.sched.editing, job });
+      P3.sched.editing = null; toast("Saved to your schedule.", "ok", 3000); P3.loadSchedule();
+    } catch (err) { toast(err.message, "bad"); }
+    return;
+  }
+  const b = t.closest("[data-jact]");
+  if (!b) return;
+  const id = b.closest("[data-job]").dataset.job, act = b.dataset.jact, j = P3.sched.jobs.find((x) => x.id === id);
+  try {
+    if (act === "edit") { P3.sched.editing = id; P3.renderSchedule(); return; }
+    if (act === "delete") { if (!confirm(`Delete the job "${j.title}"?`)) return; await api("/api/schedule/action", { action: "delete", id }); }
+    if (act === "toggle") await api("/api/schedule/action", { action: "update", id, job: { enabled: !j.enabled, ...(j.when === "time" && !j.enabled && j.repeat === "once" && new Date(j.at) < new Date() ? { at: P3.localStamp(new Date(Date.now() + 600e3)) } : {}) } });
+    if (act === "run") { const r = await api("/api/schedule/action", { action: "run", id }); switchTab("chat"); await refreshState(); openConversation(r.conversation); return; }
+    P3.loadSchedule();
+  } catch (err) { toast(err.message, "bad"); }
+};
+
+/* ---- the first-start tour, then it asks if you have questions */
+P3.TOUR = [
+  ["#composer", "Talk here", "Type what you want. Chat mode talks and plans; it only builds after you click Yes."],
+  ["#mode", "Chat or Build", "Click to switch. Build mode makes, runs and tests things for real."],
+  ["#mic", "Talk instead of typing", "The mic types what you say (Ctrl+Space). The wave button is voice mode: it talks back out loud, even while it builds (Ctrl+Shift+Space)."],
+  ["#nav [data-tab=memory]", "Its memory", "Everything it remembers, sorted. Pin, change or delete anything. Personal things always ask before saving."],
+  ["#nav [data-tab=away]", "While you're away", "When you leave the PC it hunts bugs for free and learns a little (your 5% or 10% pick)."],
+  ["#nav [data-tab=schedule]", "Schedule", "Jobs for later, like a calendar: “do this Friday” or “when my usage resets”."],
+  ["#net-light", "Internet light + accounts", "Green = internet works. If it drops, a banner stays until you close it. Next to it: your Claude accounts, one click to switch."],
+  ["#nav [data-tab=settings]", "Settings", "Every feature has a switch here. Search them at the top."],
+];
+P3.tourAt = -1;
+P3.startTour = function () { P3.tourAt = 0; switchTab("chat"); $("#tour").classList.remove("hidden"); P3.paintTour(); };
+P3.paintTour = function () {
+  const card = $("#tour-card"), hole = $("#tour-hole");
+  if (P3.tourAt >= P3.TOUR.length) {
+    hole.style.display = "none";
+    card.className = "tour-card center";
+    card.innerHTML = `<h3>That's the tour!</h3><p>Got any questions about OVERDRIVE? Ask anything, it answers in a chat.</p>
+      <textarea id="tour-q" rows="2" placeholder="Like: how does voice mode work?"></textarea>
+      <div class="btns"><button class="primary" id="tour-ask">Ask it</button><button class="ghost" id="tour-end">No questions, let's go</button></div>`;
+    $("#tour-q").focus();
+    return;
+  }
+  const [sel, title, text] = P3.TOUR[P3.tourAt];
+  const el = $(sel);
+  const r = el ? el.getBoundingClientRect() : { left: innerWidth / 2 - 100, top: innerHeight / 2 - 30, width: 200, height: 60 };
+  hole.style.display = "block";
+  Object.assign(hole.style, { left: r.left - 6 + "px", top: r.top - 6 + "px", width: r.width + 12 + "px", height: r.height + 12 + "px" });
+  card.className = "tour-card";
+  card.innerHTML = `<div class="muted tour-n">${P3.tourAt + 1} / ${P3.TOUR.length}</div><h3>${esc(title)}</h3><p>${esc(text)}</p>
+    <div class="btns"><button class="primary" id="tour-next">${P3.tourAt === P3.TOUR.length - 1 ? "Finish" : "Next"}</button>${P3.tourAt ? `<button class="ghost" id="tour-back">Back</button>` : ""}<button class="ghost" id="tour-skip">Skip the tour</button></div>`;
+  const cw = 330, below = r.top + r.height + 18 + 190 < innerHeight;
+  card.style.left = Math.max(16, Math.min(innerWidth - cw - 16, r.left + r.width / 2 - cw / 2)) + "px";
+  card.style.top = (below ? r.top + r.height + 18 : Math.max(16, r.top - 18 - card.offsetHeight)) + "px";
+  if (!below) requestAnimationFrame(() => { card.style.top = Math.max(16, r.top - 18 - card.offsetHeight) + "px"; });
+};
+P3.endTour = async function () {
+  $("#tour").classList.add("hidden"); P3.tourAt = -1;
+  if (!S.state.settings.tour_done) await P3.setNow({ tour_done: true });
+};
+P3.tourClick = async function (e) {
+  const id = e.target.id;
+  if (id === "tour-next") { P3.tourAt++; P3.paintTour(); }
+  if (id === "tour-back") { P3.tourAt--; P3.paintTour(); }
+  if (id === "tour-skip" || id === "tour-end") P3.endTour();
+  if (id === "tour-ask") {
+    const q = $("#tour-q").value.trim();
+    await P3.endTour();
+    if (q) { newChat(); send("I just did the OVERDRIVE tour. My question: " + q); }
   }
 };

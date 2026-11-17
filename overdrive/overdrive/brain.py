@@ -90,10 +90,11 @@ def find_cli(custom: str = "") -> str | None:
     return None
 
 
-async def _run(cmd: list[str], timeout: float = 25.0) -> tuple[int, str, str]:
+async def _run(cmd: list[str], timeout: float = 25.0, env: dict | None = None) -> tuple[int, str, str]:
+    full = {**os.environ, **env} if env else None
     def go() -> tuple[int, str, str]:
         r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace",
-                           timeout=timeout, creationflags=NO_WINDOW, stdin=subprocess.DEVNULL)
+                           timeout=timeout, creationflags=NO_WINDOW, stdin=subprocess.DEVNULL, env=full)
         return r.returncode, r.stdout, r.stderr
     return await asyncio.to_thread(go)
 
@@ -107,10 +108,10 @@ async def cli_version(cli: str) -> str | None:
     return m.group(1) if code == 0 and m else None
 
 
-async def auth_status(cli: str) -> dict:
-    """{'loggedIn': bool, 'method': str, 'plan_ok': bool, 'note': str}"""
+async def auth_status(cli: str, env: dict | None = None) -> dict:
+    """{'loggedIn': bool, 'method': str, 'plan_ok': bool, 'note': str, 'email': str}"""
     try:
-        code, out, err = await _run([cli, "auth", "status"])
+        code, out, err = await _run([cli, "auth", "status"], env=env)
     except (OSError, subprocess.SubprocessError) as e:
         return {"loggedIn": False, "method": "unknown", "plan_ok": False, "note": f"couldn't run Claude Code: {e}"}
     try:
@@ -127,22 +128,24 @@ async def auth_status(cli: str) -> dict:
     if logged and not plan_ok:
         note = (f"Claude Code is signed in with '{method}', not a claude.ai plan. Runs could be billed "
                 "to an API account. Sign in with your claude.ai account instead.")
-    return {"loggedIn": logged, "method": method, "plan_ok": plan_ok, "note": note}
+    email = str(j.get("email") or (j.get("account") or {}).get("email") or "") if isinstance(j, dict) else ""
+    return {"loggedIn": logged, "method": method, "plan_ok": plan_ok, "note": note, "email": email}
 
 
-def open_console(cmd: list[str] | str, title: str = "OVERDRIVE setup") -> None:
+def open_console(cmd: list[str] | str, title: str = "OVERDRIVE setup", env: dict | None = None) -> None:
     """Open a VISIBLE terminal window running cmd (install / sign in), so you can see what happens."""
+    full = {**os.environ, **env} if env else None
     if IS_WINDOWS:
         if isinstance(cmd, str):
             args = ["powershell.exe", "-NoProfile", "-NoExit", "-Command", cmd]
         else:
             args = ["cmd.exe", "/k", *cmd]
-        subprocess.Popen(args, creationflags=NEW_CONSOLE, close_fds=True)
+        subprocess.Popen(args, creationflags=NEW_CONSOLE, close_fds=True, env=full)
     else:
         shell = cmd if isinstance(cmd, str) else " ".join(cmd)
         for term in ("x-terminal-emulator", "gnome-terminal", "konsole", "xterm"):
             if shutil.which(term):
-                subprocess.Popen([term, "-e", "bash", "-lc", shell + "; exec bash"])
+                subprocess.Popen([term, "-e", "bash", "-lc", shell + "; exec bash"], env=full)
                 return
         raise OSError("no terminal app found; run this yourself: " + shell)
 

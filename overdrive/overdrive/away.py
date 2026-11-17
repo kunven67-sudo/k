@@ -293,3 +293,16 @@ class Away:
         if res["marked"] or res["ask"]:
             self.od.events.publish("projects_done", **res)
             self.od.audit.write("projects_auto_done", res)
+        # old chats: same switch (always = move to the Done folder, ask = ask you once, never = leave them)
+        old = self.od.old_chats(int(s.get("auto_done_days")))
+        asked = set(self.state.get("chats_asked", []))
+        if s.get("auto_done") == "always":
+            for cid in old:
+                self.od.set_chat_done(cid, True)
+        elif s.get("auto_done") == "ask":
+            new = [c for c in old if c not in asked]
+            if new:
+                self.state["chats_asked"] = sorted(asked | set(new))[-500:]
+                self._save()
+                self.od.events.publish("chats_done_ask", chats=[{"id": c, "title": self.od.conversations[c].title}
+                                                               for c in new])

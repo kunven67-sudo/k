@@ -21,6 +21,7 @@
       <button data-tab="chat" class="on"><span class="ic ic-chat"></span>Chat</button>
       <button data-tab="memory"><span class="ic ic-brain"></span>Memory <span id="nav-mem" class="pill"></span></button>
       <button data-tab="away"><span class="ic ic-moon"></span>While away <span id="nav-away" class="pill"></span></button>
+      <button data-tab="schedule"><span class="ic ic-clock"></span>Schedule <span id="nav-jobs" class="pill"></span></button>
       <button data-tab="status"><span class="ic ic-grid"></span>Status <span id="nav-points" class="pill"></span></button>
       <button data-tab="logs"><span class="ic ic-log"></span>Logs</button>
       <button data-tab="tools"><span class="ic ic-tool"></span>Tools</button>
@@ -31,6 +32,8 @@
     <div id="chats"></div>
     <div id="brain-box">
       <div id="brain-line"><span class="led"></span><span id="brain-text">Checking Claude Code...</span></div>
+      <div class="side-row"><button id="net-light" class="net-light" title="Internet"><span class="nl-dot"></span><span id="net-text">Internet</span></button>
+        <button id="acct-chip" class="acct-chip" title="Your Claude accounts"><span class="ic ic-user"></span><span id="acct-name">main</span></button></div>
       <div id="usage-bars"></div>
     </div>
   </aside>
@@ -97,6 +100,14 @@
         <div class="bar-right"><span id="away-chip" class="chip"></span><button id="learn-now" class="ghost">Learn something now</button></div>
       </header>
       <div class="scroll" id="away-body"><div class="loading">Loading...</div></div>
+    </section>
+
+    <!-- SCHEDULE (Piece 3) -->
+    <section id="tab-schedule" class="tab">
+      <header class="bar"><div class="bar-title">Schedule</div>
+        <div class="bar-right"><span class="muted">Jobs for later, like a calendar. It does them by itself at that time.</span></div>
+      </header>
+      <div class="scroll" id="sched-body"><div class="loading">Loading...</div></div>
     </section>
 
     <!-- STATUS -->
@@ -169,6 +180,7 @@
   <figure class="lb-fig"><img id="lb-img" alt=""><figcaption id="lb-cap"></figcaption></figure>
   <button class="lb-nav lb-next" id="lb-next" title="Next (Right arrow)">&#8250;</button>
 </div>
+<div id="tour" class="tour hidden"><div id="tour-hole" class="tour-hole"></div><div id="tour-card" class="tour-card"></div></div>
 <div id="toasts"></div>
 <script src="/static/md.js"></script>
 <script src="/static/p3.js"></script>

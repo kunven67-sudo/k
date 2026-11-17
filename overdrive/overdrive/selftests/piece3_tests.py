@@ -451,3 +451,210 @@ def test_e2e_away_learn_and_hunt():
 def json_text(req) -> str:
     import json as _json
     return _json.dumps(req.get("messages", []))
+
+
+# ================================================================ Part 4: schedule, accounts, internet, done chats
+@covers(84, title="Schedule: jobs come due at their time, repeat, skip or run after the PC was off, usage-reset jobs")
+def test_schedule_jobs():
+    from datetime import datetime, timedelta
+    from ..schedule import Schedule, reset_passed
+    with TempDir() as tmp:
+        sc = Schedule(tmp)
+        now = datetime.now()
+        stamp = lambda d: d.strftime("%Y-%m-%dT%H:%M")
+        a = sc.add({"text": "check the racer", "at": stamp(now + timedelta(minutes=5)), "repeat": "daily"})
+        assert a["title"] == "check the racer" and a["enabled"]
+        for bad in ({"text": ""}, {"text": "x", "at": "soon"}, {"text": "x", "at": stamp(now - timedelta(days=1))},
+                    {"text": "x", "at": stamp(now), "repeat": "hourly"}):
+            try:
+                sc.add(bad)
+                raise AssertionError(f"should refuse {bad}")
+            except ValueError:
+                pass
+        never = lambda j: False
+        assert sc.due(now, never, started_at=0) == []
+        later = now + timedelta(minutes=6)
+        due = sc.due(later, never, started_at=0)
+        assert [j["id"] for j in due] == [a["id"]]
+        sc.mark_ran(a, "t1", "c1", now=later)
+        assert sc.get(a["id"])["enabled"] and sc.get(a["id"])["at"] > stamp(later)        # daily: moved to tomorrow
+        # the PC was off at that time: "skip" skips it, "run" runs it now
+        b = sc.add({"text": "skip me", "at": stamp(now + timedelta(minutes=1)), "missed": "skip"})
+        c = sc.add({"text": "run me", "at": stamp(now + timedelta(minutes=1)), "missed": "run"})
+        started = (now + timedelta(minutes=30)).timestamp()
+        due = sc.due(now + timedelta(minutes=31), never, started_at=started)
+        assert [j["id"] for j in due] == [c["id"]] and not sc.get(b["id"])["enabled"], due
+        sc.mark_ran(c, "t2", "c2")
+        assert not sc.get(c["id"])["enabled"] and sc.get(c["id"])["finished"]               # once: finished
+        u = sc.add({"text": "build it", "when": "usage_reset", "mode": "build"})
+        assert [j["id"] for j in sc.due(now, lambda j: True, 0)] == [u["id"]]
+        assert Schedule(tmp).get(u["id"])["mode"] == "build"                                # saved
+        import time as _t
+        assert reset_passed({"five_hour": {"resets_at": _t.time() - 10}}, since=_t.time() - 100)
+        assert not reset_passed({"five_hour": {"resets_at": _t.time() + 600}}, since=_t.time() - 100)
+        sc.delete(u["id"])
+        assert sc.get(u["id"]) is None
+
+
+@covers(84, 33, cli=True, title="Claude can put a job on the schedule only after your Yes, and due jobs run by themselves")
+def test_e2e_schedule_tool_and_run():
+    import asyncio
+    from datetime import datetime, timedelta
+
+    def go(tmp, fake):
+        od = make_agent(tmp, fake, mode="chat")
+        at = (datetime.now() + timedelta(minutes=2)).strftime("%Y-%m-%dT%H:%M")
+
+        def script(req, f):
+            if not is_overdrive_main(req):
+                return [X("ok")]
+            text = json_text(req)
+            i = turn_index(req)
+            if "Scheduled job" in text:
+                return [X("Doing the scheduled job now.")]
+            if i == 0:
+                return [T("schedule_job", title="Night map", text="Work on the night map and test it", at=at,
+                          mode="build", reason="you asked for Friday")]
+            return [X("Okay.")]
+        fake.script = script
+        cards = []
+
+        def answer(card):
+            cards.append(card.public())
+            return ("yes", None, "")
+        rec = run_task(od, "do the night map later today", answer=answer)
+        assert rec.status == "done" and len(cards) == 1, (rec.status_reason, cards)
+        assert "Night map" in cards[0]["body"]["preview"]["plan"]
+        jobs = od.schedule.jobs
+        assert len(jobs) == 1 and jobs[0]["mode"] == "build" and jobs[0]["by"].startswith("OVERDRIVE"), jobs
+        rec2 = run_task(od, "do it again", answer=lambda c: ("no", None, "no thanks"))      # No = nothing added
+        assert len(od.schedule.jobs) == 1
+        jobs[0]["at"] = (datetime.now() - timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M")
+
+        async def main():
+            od.events.bind_loop(asyncio.get_running_loop())
+            ran = await od.schedule_tick()
+            assert len(ran) == 1
+            while od.current is not None:
+                await asyncio.sleep(0.1)
+            t = od.task_store.load(ran[0])
+            # Build mode without a plan from the fake Claude = "partly" (the checker is strict, as it should be)
+            assert t.status in ("done", "partly") and "Scheduled job" in t.request and t.mode == "build", (t.status, t.status_reason)
+            assert od.conversations[t.conversation].title == "Night map"
+            assert not od.schedule.jobs[0]["enabled"]                                       # once: done
+            assert await od.schedule_tick() == []
+        asyncio.run(main())
+    with_fake(lambda r, f: [X("ok")], go)
+
+
+@covers(81, title="Accounts: add, one-click switch (never by itself), each keeps its own limits, chats carry over")
+def test_accounts():
+    from ..accounts import MAIN, Accounts
+    from ..limits import Usage
+    with TempDir() as tmp:
+        acc = Accounts(tmp / "home", tmp)
+        usage = Usage(tmp)
+        assert acc.active == MAIN and acc.env() == {}
+        b = acc.add("Second account")
+        assert Path(b["dir"]).is_dir() and acc.env("Second account") == {"CLAUDE_CONFIG_DIR": b["dir"]}
+        for bad in ("", "second ACCOUNT", "x" * 0, "bad/name"):
+            try:
+                acc.add(bad)
+                raise AssertionError(f"should refuse {bad!r}")
+            except ValueError:
+                pass
+        usage.update_rate_limit({"rate_limit_type": "five_hour", "status": "rejected", "utilization": 1.0})
+        assert not usage.can_start(_FakeSettings())[0]
+        acc.switch("Second account", usage)
+        assert acc.active == "Second account" and usage.can_start(_FakeSettings())[0]     # its own limits
+        acc.switch(MAIN, usage)
+        assert usage.rate_limits["five_hour"]["status"] == "rejected"                    # main's limits came back
+        # a chat's saved history comes along to the other account
+        sid = "0f1e2d3c-1111-2222-3333-444455556666"
+        src = tmp / "fake-main"
+        acc.items.append({"name": "Third", "dir": str(src), "added": ""})
+        (src / "projects" / "C--work").mkdir(parents=True)
+        (src / "projects" / "C--work" / f"{sid}.jsonl").write_text("{}\n")
+        assert acc.carry_session(sid, "Third", "Second account")
+        assert (Path(b["dir"]) / "projects" / "C--work" / f"{sid}.jsonl").is_file()
+        assert not acc.carry_session("../../evil", "Third", "Second account")
+        assert not acc.carry_session("aaaaaaaa-0000", "Third", "Second account")
+        try:
+            acc.remove(MAIN)
+            raise AssertionError("main can't be removed")
+        except ValueError:
+            pass
+        acc.remove("Second account")
+        assert Accounts(tmp / "home", tmp).names() == [MAIN, "Third"]
+
+
+class _FakeSettings:
+    def get(self, k):
+        return {"daily_budget_usd": 100.0, "pause_at_usage_pct": 90}[k]
+
+
+@covers(79, title="Internet light: notices a drop and the return, and remembers how long it was out")
+def test_internet_light():
+    import asyncio
+    from ..net import Net
+
+    class OD:
+        class audit:
+            @staticmethod
+            def write(*a, **k):
+                pass
+
+        class events:
+            seen: list = []
+
+            @classmethod
+            def publish(cls, t, **d):
+                cls.seen.append((t, d))
+    state = {"ok": True}
+    n = Net(OD, check=lambda: state["ok"])
+
+    async def main():
+        await n.poll()
+        assert n.online is True and n.drops == []
+        state["ok"] = False
+        await n.poll()
+        await n.poll()                                   # still down: no second event
+        assert n.online is False and len(n.drops) == 1 and n.drops[0]["up"] is None
+        state["ok"] = True
+        await n.poll()
+        assert n.online and n.drops[0]["seconds"] is not None
+    asyncio.run(main())
+    assert [t for t, _ in OD.events.seen] == ["net", "net", "net"]
+
+
+@covers(45, title="Done folder: chats move to Done (by you, or when old), and talking in one brings it back")
+def test_done_chats():
+    import asyncio
+    from datetime import datetime, timedelta, timezone
+    with TempDir() as tmp:
+        from ..agent import Overdrive
+        od = Overdrive(home=tmp / "home", test_env={"X": "1"})
+        a, b = od.new_conversation("old one"), od.new_conversation("new one")
+        a.updated = (datetime.now(timezone.utc) - timedelta(days=40)).isoformat()
+        assert od.old_chats(14) == [a.id]
+        od.set_chat_done(b.id, True)
+        assert Overdrive(home=tmp / "home", test_env={"X": "1"}).conversations[b.id].done        # saved
+        od.settings.update({"auto_done": "always"}, by="test")
+        od.away.last_auto_done = ""
+        od.away._auto_done_daily()
+        assert od.conversations[a.id].done
+        od.settings.update({"auto_done": "ask"}, by="test")
+        c = od.new_conversation("another old")
+        c.updated = a.updated
+        q, _ = od.events.subscribe(0)
+        od.away.last_auto_done = ""
+        od.away._auto_done_daily()
+        asks = []
+        while not q.empty():
+            ev = q.get_nowait()
+            if ev["type"] == "chats_done_ask":
+                asks.append(ev)
+        assert asks and asks[0]["chats"][0]["id"] == c.id
+        od.away.last_auto_done = ""
+        od.away._auto_done_daily()                       # asks only once
+        assert not od.conversations[c.id].done

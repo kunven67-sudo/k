@@ -251,18 +251,30 @@ function chatRow(c, snippet) {
   row.className = "chat-row" + (c.id === S.conv ? " on" : "");
   row.dataset.chat = c.id;
   row.innerHTML = `<button class="chat-item" title="${esc(c.title)}">${esc(c.title || "Chat")}${snippet ? `<span class="snip">${esc(snippet)}</span>` : ""}</button>
-    <span class="chat-acts"><button class="ic-btn" data-ren title="Rename">${PENCIL}</button><button class="ic-btn" data-del title="Delete">${BIN}</button></span>`;
+    <span class="chat-acts"><button class="ic-btn" data-done title="${c.done ? "Bring back from Done" : "Move to the Done folder"}">${c.done ? UNDONE : DONEI}</button><button class="ic-btn" data-ren title="Rename">${PENCIL}</button><button class="ic-btn" data-del title="Delete">${BIN}</button></span>`;
   $(".chat-item", row).addEventListener("click", () => { switchTab("chat"); openConversation(c.id); });
+  $("[data-done]", row).addEventListener("click", (e) => { e.stopPropagation(); P3.chatDone(c.id, !c.done); });
   $("[data-ren]", row).addEventListener("click", (e) => { e.stopPropagation(); renameChat(c.id); });
   $("[data-del]", row).addEventListener("click", (e) => { e.stopPropagation(); deleteChat(c.id); });
   return row;
 }
+const DONEI = `<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M2 5h12v8H2zM2 5l1.5-2.5h9L14 5M6 8.5l1.5 1.5L10.5 7" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
+const UNDONE = `<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M3 8a5 5 0 1 0 1.6-3.6M3 2.5v3h3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 function renderChats() {
   if (S.chatHits) return renderChatHits();
   const box = $("#chats");
   const convs = (S.state && S.state.conversations) || [];
-  box.innerHTML = convs.length ? "" : `<div class="muted" style="padding:6px 10px;font-size:12.5px">No chats yet</div>`;
-  for (const c of convs) box.appendChild(chatRow(c));
+  const live = convs.filter((c) => !c.done), done = convs.filter((c) => c.done);
+  box.innerHTML = live.length ? "" : `<div class="muted" style="padding:6px 10px;font-size:12.5px">${done.length ? "All chats are in Done" : "No chats yet"}</div>`;
+  for (const c of live) box.appendChild(chatRow(c));
+  if (done.length) {
+    const head = document.createElement("button");
+    head.className = "done-head" + (S.doneOpen ? " open" : "");
+    head.innerHTML = `<span class="tri"></span>Done <span class="muted">${done.length}</span>`;
+    head.addEventListener("click", () => { S.doneOpen = !S.doneOpen; renderChats(); });
+    box.appendChild(head);
+    if (S.doneOpen) for (const c of done) { const r = chatRow(c); r.classList.add("is-done"); box.appendChild(r); }
+  }
 }
 function renderChatHits() {
   const box = $("#chats");
@@ -458,7 +470,10 @@ function turnNode(t) {
   const foot = running ? "" : `<div class="foot">${bits.map((b) => `<span>${b}</span>`).join("")}
       ${t.final_text ? `<button class="ghost" data-copyall="${t.id}" title="Copy the whole answer">Copy</button>` : ""}<button class="ghost" data-details="${t.id}">Details</button><button class="ghost" data-rerun="${t.id}" title="Send the same message again">${t.status !== "done" ? "Try again" : "Ask again"}</button></div>`;
   const mine = t.request.startsWith("GO. I said Yes") ? "" : `<div class="me-acts"><button class="ghost xs" data-edit="${t.id}" title="Put this message back in the box to change it">Edit</button><button class="ghost xs" data-copyreq="${t.id}">Copy</button></div>`;
-  wrap.innerHTML = `<div class="me"><div>${esc(t.request)}</div></div>${mine}
+  const meBubble = t.background
+    ? `<div class="me-auto"><details><summary>It started this by itself while you were away (learning, capped by your setting)</summary><pre>${esc(t.request)}</pre></details></div>`
+    : `<div class="me"><div>${esc(t.request)}</div></div>${mine}`;
+  wrap.innerHTML = `${meBubble}
     <div class="od"><div class="od-head">${head}</div>${critList(t)}${stepsList(t)}${picsHtml(t)}${answer}${P3.turnExtras(t)}${err}${changes}${undone}${flagHtml}${checks}
       <div class="cards-slot" data-task="${t.id}"></div>${foot}</div>`;
   return wrap;

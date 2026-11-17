@@ -22,6 +22,8 @@ function start(port, ...extra) {
       if (nm) p.notes = nm[1].trim();
       const im = buf.match(/IDLE (.+)/);
       if (im) p.idle = im[1].trim();
+      const nn = buf.match(/NET (.+)/);
+      if (nn) p.net = nn[1].trim();
       if (m && !p.ready) {
         p.ready = true;
         clearTimeout(t);
@@ -354,6 +356,79 @@ function start(port, ...extra) {
     await page.reload();
     await page.waitForSelector("#brain-text:has-text('signed in')", { timeout: 20000 });
     assert(!(await page.$(".banner.away")), "closed banner stays closed");
+
+    // ---- Piece 3, part 4: schedule, accounts, internet light, done folder, tour
+    await page.click("#nav [data-tab=schedule]");
+    await page.click("#sj-new");
+    await page.fill("#sj-text", "Work on the racing game's night map and test it");
+    await page.fill("#sj-title", "Night map");
+    await page.selectOption("#sj-mode", "build");
+    await page.selectOption("#sj-repeat", "weekly");
+    await page.click("#sj-save");
+    await page.waitForSelector(".job >> text=Night map", { timeout: 5000 });
+    assert((await page.innerText(".job .job-when")).startsWith("Every "), "weekly job");
+    assert((await page.innerText("#nav-jobs")) === "1", "job count in the menu");
+    await page.click("#sj-new");
+    await page.selectOption("#sj-when", "usage_reset");
+    assert(await page.isDisabled("#sj-at"), "no time for a usage-reset job");
+    await page.fill("#sj-text", "Build the next level");
+    await page.click("#sj-save");
+    await page.waitForSelector(".job >> text=When my 5-hour usage resets", { timeout: 5000 });
+    await shot(page, "18-schedule.png");
+    await page.click(".job:has-text('Build the next level') [data-jact=toggle]");
+    await page.waitForSelector("h2:has-text('Paused or finished')", { timeout: 5000 });
+    await page.click(".job:has-text('Build the next level') [data-jact=delete]");
+    await page.waitForFunction(() => document.querySelectorAll(".job").length === 1, null, { timeout: 5000 });
+
+    await page.click("#acct-chip");
+    await page.waitForSelector(".acct >> text=this PC's normal sign-in", { timeout: 10000 });
+    await page.fill("#acct-new", "Second");
+    await page.click("#acct-add");
+    await page.waitForSelector(".acct:has-text('Second') [data-acct-use]", { timeout: 10000 });
+    await page.click(".acct:has-text('Second') [data-acct-use]");
+    await page.waitForSelector("#acct-name:text-is('Second')", { timeout: 10000 });
+    await shot(page, "19-accounts.png");
+    await page.click(".acct:has-text('main') [data-acct-use]");
+    await page.waitForSelector("#acct-name:text-is('main')", { timeout: 10000 });
+    await page.click("#drawer-x");
+    await page.click("#nav [data-tab=chat]");
+    await page.evaluate(() => P3.limitHit({ account: "main", others: ["main", "Second"], resets_at: Date.now() / 1000 + 3600 }));
+    await page.waitForSelector(".banner >> text=limit is used up", { timeout: 3000 });
+    await page.click("[data-limit-use=Second]");
+    await page.waitForSelector("#acct-name:text-is('Second')", { timeout: 10000 });
+    assert(!(await page.$(".banner:has-text('limit is used up')")), "limit banner gone after switching");
+
+    await page.click("#nav [data-tab=chat]");
+    await page.waitForSelector("#net-light.up", { timeout: 10000 });
+    fs.writeFileSync(srv.net, "0");
+    await page.waitForSelector(".banner.net.down >> text=SIGNAL LOST", { timeout: 10000 });
+    assert(await page.isVisible("#net-light.down"), "red light");
+    await shot(page, "20-signal-lost.png");
+    fs.writeFileSync(srv.net, "1");
+    await page.waitForSelector(".banner.net.up >> text=BACK ONLINE", { timeout: 10000 });
+    await page.click(".banner.net .bn-x");
+    await page.waitForSelector(".banner.net", { state: "detached", timeout: 3000 });
+
+    const firstChat = "#chats .chat-row >> nth=0";
+    const name = await page.innerText(`${firstChat} >> .chat-item`);
+    await page.hover(firstChat);
+    await page.click(`${firstChat} >> [data-done]`);
+    await page.waitForSelector(".done-head", { timeout: 5000 });
+    await page.click(".done-head");
+    await page.waitForSelector(".chat-row.is-done", { timeout: 3000 });
+    assert((await page.innerText(".chat-row.is-done .chat-item")).startsWith(name.slice(0, 10)), "it's in Done");
+    await page.hover(".chat-row.is-done");
+    await page.click(".chat-row.is-done [data-done]");
+    await page.waitForSelector(".done-head", { state: "detached", timeout: 3000 });
+
+    await page.click("#nav [data-tab=settings]");
+    await page.click("#set-tour");
+    await page.waitForSelector("#tour:not(.hidden) .tour-card >> text=Talk here", { timeout: 5000 });
+    await shot(page, "21-tour.png");
+    for (let i = 0; i < 8; i++) await page.click("#tour-next");
+    await page.waitForSelector(".tour-card.center >> text=Got any questions", { timeout: 3000 });
+    await page.click("#tour-end");
+    assert(await page.isHidden("#tour"), "tour closed");
   } catch (e) {
     errors.push(String(e && e.stack || e));
   } finally {

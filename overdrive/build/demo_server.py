@@ -235,6 +235,14 @@ async def main() -> None:
         except (OSError, ValueError):
             return 0.0
     od.away.idle_fn = idle
+    # the internet light reads a file too (1 = up, 0 = down), and the tour is skipped unless a test opens it
+    net_file = root / "net.txt"
+    net_file.write_text("1")
+    print(f"NET {net_file}", flush=True)
+    od.net.check = lambda: net_file.read_text().strip() != "0"
+    from overdrive.net import Net
+    od.net.run = lambda: Net.run(od.net, every=0.5)
+    od.settings.update({"tour_done": True}, by="demo")
     from overdrive.away import Away
     od.away.run = lambda: Away.run(od.away, every=1.0)
     if a.no_cli:

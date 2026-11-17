@@ -113,6 +113,10 @@ class Server:
             "notes": list(od.startup_notes),
             "queue": list(od.queue),
             "away": od.away.public(),
+            "net": od.net.public(),
+            "accounts": od.accounts.public(),
+            "jobs": len([j for j in od.schedule.jobs if j.get("enabled")]),
+            "tour_done": bool(od.settings.get("tour_done")),
             "memory_counts": od.memory.counts(),
         }
 
@@ -133,6 +137,9 @@ class Server:
             ("/api/chat/search", self.chat_search, ["GET"]), ("/api/open", self.open, ["POST"]), ("/api/quit", self.quit, ["POST"]),
             # Piece 3: memory page
             ("/api/queue", self.queue_action, ["POST"]),
+            ("/api/accounts", self.accounts_page, ["GET"]), ("/api/accounts/action", self.accounts_action, ["POST"]),
+            ("/api/schedule", self.schedule_page, ["GET"]), ("/api/schedule/action", self.schedule_action, ["POST"]),
+            ("/api/chat/done", self.chat_done, ["POST"]),
             ("/api/away", self.away_page, ["GET"]), ("/api/away/action", self.away_action, ["POST"]),
             ("/api/memory", self.memory_page, ["GET"]), ("/api/memory/edit", self.memory_edit, ["POST"]),
             ("/api/memory/set", self.memory_set, ["POST"]), ("/api/memory/forget", self.memory_forget, ["POST"]),
@@ -238,6 +245,104 @@ class Server:
         except ValueError as e:
             return JSONResponse({"error": str(e)}, 400)
         return JSONResponse({"task": rec.public()})
+
+    # ------------------------------------------------------------------ accounts (Piece 3)
+    async def accounts_page(self, request: Request) -> Response:
+        od = self.od
+        cli = brain.find_cli(od.settings.get("cli_path"))
+        out = od.accounts.public()
+        for a in out["accounts"]:
+            if cli and not od.test_env:
+                st = await brain.auth_status(cli, env=od.accounts.env(a["name"]))
+            else:
+                st = {"loggedIn": bool(od.test_env), "plan_ok": bool(od.test_env), "method": "test", "email": ""}
+            a.update(signed_in=bool(st.get("plan_ok")), email=st.get("email", ""), note=st.get("note", ""))
+        return JSONResponse(out)
+
+    async def accounts_action(self, request: Request) -> Response:
+        b = await self._json(request)
+        act, od = str(b.get("action") or ""), self.od
+        try:
+            if act == "add":
+                item = od.accounts.add(str(b.get("name") or ""))
+                od.audit.write("account_added", {"name": item["name"]})
+                return JSONResponse({"added": item["name"], **await self._signin(item["name"])})
+            if act == "signin":
+                return JSONResponse(await self._signin(str(b.get("name") or "")))
+            if act == "switch":
+                if od.current is not None and not od.current.rec.background:
+                    return JSONResponse({"error": "Wait until the running task is finished."}, 409)
+                res = od.accounts.switch(str(b.get("name") or ""), od.usage)
+                od._setup_cache = None
+                od.audit.write("account_switched", {**res, "by": "you"})
+                od.events.publish("usage", usage=od.usage.public())
+                od.events.publish("accounts", accounts=od.accounts.public())
+                return JSONResponse(res)
+            if act == "remove":
+                od.accounts.remove(str(b.get("name") or ""))
+                od.audit.write("account_removed", {"name": b.get("name")})
+                return JSONResponse(od.accounts.public())
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, 400)
+        return JSONResponse({"error": "unknown action"}, 400)
+
+    async def _signin(self, name: str) -> dict:
+        od = self.od
+        if od.accounts.get(name) is None:
+            raise ValueError("no such account")
+        cli = brain.find_cli(od.settings.get("cli_path"))
+        if not cli:
+            return {"opened": False, "note": "Install Claude Code first."}
+        try:
+            brain.open_console([cli, "auth", "login"], f"Sign in: {name}", env=od.accounts.env(name))
+        except OSError as e:
+            return {"opened": False, "note": str(e)}
+        od.audit.write("account_signin_opened", {"name": name})
+        return {"opened": True}
+
+    # ------------------------------------------------------------------ schedule (Piece 3)
+    async def schedule_page(self, request: Request) -> Response:
+        convs = [{"id": c.id, "title": c.title} for c in sorted(self.od.conversations.values(), key=lambda c: c.created,
+                                                                 reverse=True) if not c.done][:60]
+        return JSONResponse({"jobs": self.od.schedule.jobs, "chats": convs})
+
+    async def schedule_action(self, request: Request) -> Response:
+        b = await self._json(request)
+        act, od = str(b.get("action") or ""), self.od
+        job = b.get("job") if isinstance(b.get("job"), dict) else {}
+        try:
+            if act == "add":
+                res = od.schedule.add(job, by="you")
+            elif act == "update":
+                res = od.schedule.update(str(b.get("id") or ""), job)
+            elif act == "delete":
+                od.schedule.delete(str(b.get("id") or ""))
+                res = {"deleted": b.get("id")}
+            elif act == "run":
+                j = od.schedule.get(str(b.get("id") or ""))
+                if j is None:
+                    raise ValueError("no such job")
+                if od.current is not None and not od.current.rec.background:
+                    return JSONResponse({"error": "Wait until the running task is finished."}, 409)
+                conv = od.conversations.get(j.get("conversation") or "") or od.new_conversation(j["title"])
+                conv.mode = j["mode"]
+                rec = await od.send(j["text"], conv.id)
+                res = {"task": rec.id, "conversation": conv.id}
+            else:
+                return JSONResponse({"error": "unknown action"}, 400)
+        except (ValueError, Busy) as e:
+            return JSONResponse({"error": str(e)}, 400)
+        od.audit.write("schedule_" + act, {"id": b.get("id"), "job": job, "by": "you"})
+        od.events.publish("schedule", jobs=od.schedule.jobs)
+        return JSONResponse(res)
+
+    async def chat_done(self, request: Request) -> Response:
+        b = await self._json(request)
+        try:
+            return JSONResponse({"conversation": self.od.set_chat_done(str(b.get("conversation") or ""),
+                                                                       bool(b.get("done")))})
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, 400)
 
     # ------------------------------------------------------------------ while you're away (Piece 3)
     async def away_page(self, request: Request) -> Response:
@@ -640,11 +745,15 @@ async def serve(od: Overdrive, open_ui: bool = True) -> None:
         open_window(url, od.paths.data / "window-profile")
     idle_task = asyncio.create_task(server.watch_idle())
     away_task = asyncio.create_task(od.away.run())
+    net_task = asyncio.create_task(od.net.run())
+    sched_task = asyncio.create_task(od.run_schedule())
     try:
         await server.should_exit.wait()
     finally:
         idle_task.cancel()
         away_task.cancel()
+        net_task.cancel()
+        sched_task.cancel()
         if od.busy():
             await od.stop()
         userver.should_exit = True

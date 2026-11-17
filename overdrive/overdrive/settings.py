@@ -64,6 +64,7 @@ DEFAULTS: dict[str, Any] = {
     "start_with_windows": False,
     "auto_done": "ask",          # projects nobody touched for a while: always (mark done) / ask / never
     "auto_done_days": 14,
+    "tour_done": False,          # the first-start tour was shown
 }
 
 _SCHEMA: dict[str, tuple] = {
@@ -102,6 +103,7 @@ _SCHEMA: dict[str, tuple] = {
     "start_with_windows": (bool, None, "Start with Windows"),
     "auto_done": (str, lambda v: v in ("always", "ask", "never"), "Done projects"),
     "auto_done_days": (int, lambda v: 3 <= v <= 365, "Not touched for (days)"),
+    "tour_done": (bool, None, "Tour shown"),
 }
 
 

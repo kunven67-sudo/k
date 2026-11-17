@@ -47,6 +47,7 @@ except Exception as _e:  # pragma: no cover
     SDK_VERSION = f"missing ({_e})"
 
 READ_RISKS = (Risk.INTERNAL, Risk.READ)
+ALWAYS_ASK = {"schedule_job"}
 TOOL_TIMEOUT_S = 60
 
 
@@ -71,6 +72,9 @@ class Conversation:
     session_rules: str = ""     # fingerprint of the mode + talk-style rules the session started with (Piece 2)
     model: str = ""             # per-chat model/effort picked for a big job ("" = use Settings)
     effort: str = ""
+    account: str = ""           # Piece 3: the Claude account its saved history lives on
+    done: bool = False          # Piece 3: moved to the Done folder
+    updated: str = ""           # Piece 3: last message (old chats can move to Done)
 
 
 @dataclass
@@ -139,6 +143,15 @@ class Overdrive:
         self.queue: list[dict] = []             # Piece 3: messages you sent (typed or said) while it was busy
         self._queue_paused = False              # STOP pauses the queue until you send again
         self.away = Away(self)
+        from .accounts import Accounts
+        from .net import Net
+        from .schedule import Schedule
+        self.accounts = Accounts(self.paths.home, self.paths.data)
+        self.schedule = Schedule(self.paths.data)
+        self.net = Net(self)
+        self.started_at = time.time()
+        from .schedule import make_schedule_tool
+        self.tools.add(make_schedule_tool(self))
         self.removed_env = [] if test_env else brain.clean_env_for_plan()
         self.audit.on_write(lambda e: self.events.publish("log", entry={k: e[k] for k in ("seq", "ts", "kind", "task")}))
         self.audit.write("app_start", {
@@ -186,7 +199,8 @@ class Overdrive:
                 out.update(auth={"loggedIn": True, "method": "test (fake Claude)", "plan_ok": True, "note": ""},
                            ready=True)
             else:
-                out["auth"] = await brain.auth_status(cli)
+                out["auth"] = await brain.auth_status(cli, env=self.accounts.env())
+                out["account"] = self.accounts.active
                 if not out["auth"].get("plan_ok"):
                     out.update(problem=out["auth"].get("note") or brain.FRIENDLY["auth"], kind="auth")
                 else:
@@ -240,6 +254,9 @@ class Overdrive:
         rec.settings["effort"] = conv.effort or rec.settings["effort"]
         rec.settings["mode"] = rec.mode
         conv.tasks.append(rec.id)
+        conv.updated = utc_now_iso()
+        if conv.done and not background:
+            conv.done = False                    # talking in a done chat brings it back
         self._save_conversations()
         st = RunState(rec=rec, conv=conv)
         self.current = st
@@ -406,6 +423,8 @@ class Overdrive:
         policy = decide(s.get("permissions"), risk)
         if spec.status == "experimental" and risk not in READ_RISKS and policy == "auto":
             policy = "ask"
+        if spec.name in ALWAYS_ASK and policy != "block":
+            policy = "ask"                         # Piece 3: things that spend usage later always ask first
         mem_why = ""
         if spec.name.startswith("memory_") and risk not in READ_RISKS and policy != "block":
             # Piece 3 (their pick): normal things save + tell you (Undo); personal things and rules ask first.
@@ -462,6 +481,72 @@ class Overdrive:
         if auto >= self.MEMORY_AUTO_PER_TASK:
             return f"it already saved {auto} things in this one task (no memory spam)"
         return ""
+
+    # ------------------------------------------------------------------ schedule (Piece 3)
+    async def run_schedule(self, every: float = 15.0) -> None:
+        while True:
+            try:
+                await self.schedule_tick()
+            except Exception as e:
+                self.audit.write("schedule_error", {"error": repr(e)[:500]})
+            await asyncio.sleep(every)
+
+    async def schedule_tick(self) -> list[str]:
+        from datetime import datetime as _dt
+        from .schedule import reset_passed
+
+        def reset_check(job: dict) -> bool:
+            try:
+                since = _dt.fromisoformat(job["created"].replace("Z", "+00:00")).timestamp()
+            except (KeyError, ValueError):
+                since = 0.0
+            return reset_passed(self.usage.rate_limits, since)
+        ran = []
+        for job in self.schedule.due(_dt.now(), reset_check, self.started_at):
+            if self.current is not None and not self.current.rec.background:
+                break                             # your own task is running: the job waits its turn
+            conv = self.conversations.get(job.get("conversation") or "")
+            if conv is None:
+                conv = self.new_conversation(job["title"])
+            conv.mode = job["mode"]
+            try:
+                rec = await self.send(f"(Scheduled job \u201c{job['title']}\u201d, set {job['created'][:10]}.) "
+                                      + job["text"], conv.id)
+            except Busy:
+                break
+            self.schedule.mark_ran(job, rec.id, conv.id)
+            self.audit.write("schedule_ran", {"job": job["id"], "title": job["title"], "task": rec.id})
+            self.events.publish("schedule", jobs=self.schedule.jobs)
+            ran.append(rec.id)
+            break                                 # one job at a time; the next one goes on the next tick
+        return ran
+
+    # ------------------------------------------------------------------ done folder for chats (Piece 3)
+    def set_chat_done(self, conv_id: str, done: bool) -> dict:
+        conv = self.conversations.get(conv_id)
+        if conv is None:
+            raise ValueError("no such chat")
+        conv.done = bool(done)
+        self._save_conversations()
+        self.audit.write("chat_done", {"conversation": conv_id, "done": conv.done, "by": "you"})
+        self.events.publish("conversation", conversation=dict(conv.__dict__))
+        return conv.__dict__
+
+    def old_chats(self, days: int) -> list[str]:
+        from datetime import datetime as _dt, timezone as _tz
+        out = []
+        now = _dt.now(_tz.utc)
+        for c in self.conversations.values():
+            if c.done or (self.current and self.current.conv.id == c.id) or c.id == self.away.state.get("conversation"):
+                continue
+            stamp = c.updated or c.created
+            try:
+                age = (now - _dt.fromisoformat(stamp.replace("Z", "+00:00"))).days
+            except ValueError:
+                continue
+            if age >= days:
+                out.append(c.id)
+        return out
 
     def _note_refused(self, st: RunState, tool_name: str, title: str, risk: str, decision: str, why: str,
                       inp: dict) -> None:
@@ -870,7 +955,7 @@ class Overdrive:
     # ------------------------------------------------------------------ running a task
     def _options(self, st: RunState, cli: str) -> Any:
         s = self.settings
-        env = {"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"}
+        env = {"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", **self.accounts.env()}
         if self.test_env:
             env.update(self.test_env)
         fallback = s.get("fallback_model") or None
@@ -1020,6 +1105,16 @@ class Overdrive:
 
     async def _talk(self, st: RunState, cli: str) -> None:
         rec = st.rec
+        acct = self.accounts.active
+        if st.conv.session_id and st.conv.account and st.conv.account != acct:
+            # the chat's saved history lives on the other account: bring it along so the chat goes on
+            if self.accounts.carry_session(st.conv.session_id, st.conv.account, acct):
+                rec.flags.append(f"Continued this chat on the {acct} account.")
+            else:
+                st.conv.session_id, st.conv.cost_total = "", 0.0
+                rec.flags.append(f"Switched to the {acct} account; this chat's earlier history couldn't come along, "
+                                 "so it started fresh.")
+        st.conv.account = acct
         options = self._options(st, cli)
         self.audit.write("network", {"to": "Anthropic (Claude), through Claude Code", "why": "brain run",
                                      "model": options.model, "resume": bool(options.resume)}, task=rec.id)
@@ -1109,6 +1204,12 @@ class Overdrive:
         self.current = None
         self._emit_task(rec)
         self.events.publish("usage", usage=self.usage.public())
+        out_of_usage = st.error_kind in ("rate_limit", "billing") or ("used up" in (st.limit or ""))
+        if out_of_usage and not rec.background:
+            # Tell you and let YOU pick another account (never switches by itself)
+            fh = self.usage.rate_limits.get("five_hour") or {}
+            self.events.publish("limit_hit", account=self.accounts.active, others=self.accounts.names(),
+                                resets_at=fh.get("resets_at"), text=st.limit or st.error_text)
         if st.build_go and not st.stopped and not st.error_kind and not st.limit:
             self._go_build_handle = asyncio.create_task(self._go_build(st.conv.id))
         if st.stopped:
