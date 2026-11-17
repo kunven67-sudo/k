@@ -117,6 +117,7 @@ class Server:
             "accounts": od.accounts.public(),
             "jobs": len([j for j in od.schedule.jobs if j.get("enabled")]),
             "tour_done": bool(od.settings.get("tour_done")),
+            "btw": od.btw.public(),
             "memory_counts": od.memory.counts(),
         }
 
@@ -139,7 +140,7 @@ class Server:
             ("/api/queue", self.queue_action, ["POST"]),
             ("/api/accounts", self.accounts_page, ["GET"]), ("/api/accounts/action", self.accounts_action, ["POST"]),
             ("/api/schedule", self.schedule_page, ["GET"]), ("/api/schedule/action", self.schedule_action, ["POST"]),
-            ("/api/chat/done", self.chat_done, ["POST"]),
+            ("/api/chat/done", self.chat_done, ["POST"]), ("/api/btw", self.btw_ask, ["POST"]),
             ("/api/away", self.away_page, ["GET"]), ("/api/away/action", self.away_action, ["POST"]),
             ("/api/memory", self.memory_page, ["GET"]), ("/api/memory/edit", self.memory_edit, ["POST"]),
             ("/api/memory/set", self.memory_set, ["POST"]), ("/api/memory/forget", self.memory_forget, ["POST"]),
@@ -335,6 +336,13 @@ class Server:
         od.audit.write("schedule_" + act, {"id": b.get("id"), "job": job, "by": "you"})
         od.events.publish("schedule", jobs=od.schedule.jobs)
         return JSONResponse(res)
+
+    async def btw_ask(self, request: Request) -> Response:
+        b = await self._json(request)
+        try:
+            return JSONResponse({"item": self.od.btw.ask(str(b.get("text") or ""))})
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, 400)
 
     async def chat_done(self, request: Request) -> Response:
         b = await self._json(request)

@@ -12,6 +12,7 @@ P3.state = function (st) {
   P3.renderQueue(st.queue);
   P3.paintAwayChip(st.away);
   P3.paintNet(st.net);
+  P3.btw.items = st.btw || [];
   P3.paintAccount(st.accounts);
   $("#nav-jobs").textContent = st.jobs ? String(st.jobs) : "";
   if (!st.tour_done && !P3.toured) { P3.toured = true; setTimeout(() => { if ($("#setup").classList.contains("hidden")) P3.startTour(); }, 900); }
@@ -36,6 +37,7 @@ P3.event = function (ev) {
     case "queue": if (S.state) S.state.queue = ev.queue; P3.renderQueue(ev.queue); break;
     case "away": P3.paintAwayChip(ev.away); if (S.tab === "away") P3.loadAway(); break;
     case "away_report": P3.awayReport(ev.report); if (S.tab === "away") P3.loadAway(); break;
+    case "btw": P3.btwItem(ev.item); break;
     case "net": if (S.state) S.state.net = ev.net; P3.paintNet(ev.net); break;
     case "accounts": P3.paintAccount(ev.accounts); break;
     case "limit_hit": P3.limitHit(ev); break;
@@ -120,6 +122,10 @@ P3.bind = function () {
   $("#net-light").addEventListener("click", () => { const n = P3.net.last; toast(!n ? "Checking the internet..." : n.online ? "The internet is working." : "No internet right now. Claude can't think until it's back.", n && n.online === false ? "warn" : "ok", 4000); });
   $("#drawer-body").addEventListener("click", P3.accountsClick);
   $("#tour").addEventListener("click", P3.tourClick);
+  $("#btw-toggle").addEventListener("click", () => { if ($("#btw").classList.contains("hidden")) P3.openBtw(true); else { $("#btw").classList.add("hidden"); $("#btw-toggle").classList.remove("on"); } });
+  $("#btw-x").addEventListener("click", () => { $("#btw").classList.add("hidden"); $("#btw-toggle").classList.remove("on"); });
+  $("#btw-form").addEventListener("submit", (e) => { e.preventDefault(); P3.askBtw($("#btw-q").value); });
+  document.addEventListener("keydown", (e) => { if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "b") { e.preventDefault(); P3.openBtw(true); } });
   window.addEventListener("resize", () => { if (P3.tourAt >= 0) P3.paintTour(); });
   $("#learn-now").addEventListener("click", async () => {
     try { await api("/api/away/action", { action: "learn_now" }); toast("It's learning something now (in the \u201cWhile you were away\u201d chat).", "ok", 5000); P3.loadAway(); }
@@ -440,6 +446,8 @@ P3.voiceSend = async function () {
   if (["stop talking", "be quiet", "shut up", "stop"].includes(low)) { P3.shush(); P3.paintVoice(); return; }
   if (["end voice", "end voice mode", "goodbye", "bye"].includes(low)) { P3.endVoice(); return; }
   $("#vb-heard").textContent = text;
+  const btw = text.match(/^by the way[,\s]+(.+)/i);
+  if (btw && S.state && S.state.current) { await P3.askBtw(btw[1]); P3.paintVoice(); return; }
   await send(text, "voice");
   P3.paintVoice();
 };
@@ -941,4 +949,32 @@ P3.tourClick = async function (e) {
     await P3.endTour();
     if (q) { newChat(); send("I just did the OVERDRIVE tour. My question: " + q); }
   }
+};
+
+/* ================================================================ Part 5: the "by the way" box */
+P3.btw = { items: [] };
+P3.openBtw = function (focus) { $("#btw").classList.remove("hidden"); $("#btw-toggle").classList.add("on"); if (focus) $("#btw-q").focus(); P3.paintBtw(); };
+P3.paintBtw = function () {
+  const list = $("#btw-list");
+  list.innerHTML = P3.btw.items.length ? P3.btw.items.map((i) => `<div class="btw-item ${esc(i.status)}"><div class="btw-q">${esc(i.q)}</div>
+      <div class="btw-a">${i.status === "thinking" ? `<span class="spin"></span> thinking...` : md(i.a)}</div></div>`).join("")
+    : `<div class="muted btw-empty">Ask anything while it works: “what does that error mean?”, “how long will this take?”. The answer shows up here, not in the main chat, and the main job doesn't stop or slow down.</div>`;
+  list.scrollTop = list.scrollHeight;
+};
+P3.btwItem = function (item) {
+  const i = P3.btw.items.findIndex((x) => x.id === item.id);
+  if (i >= 0) P3.btw.items[i] = item; else P3.btw.items.push(item);
+  P3.btw.items = P3.btw.items.slice(-20);
+  if (item.status !== "thinking") {
+    if ($("#btw").classList.contains("hidden")) toast("By the way answer is ready (top right).", "ok", 4000);
+    if (P3.v && P3.v.mode) P3.say(item.a);
+  }
+  P3.paintBtw();
+};
+P3.askBtw = async function (q) {
+  q = (q || "").trim();
+  if (!q) return;
+  P3.openBtw(false);
+  try { const r = await api("/api/btw", { text: q }); P3.btwItem(r.item); $("#btw-q").value = ""; }
+  catch (e) { toast(e.message, "warn"); }
 };

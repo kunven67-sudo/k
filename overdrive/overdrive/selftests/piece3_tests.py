@@ -11,7 +11,7 @@ from ..memory import Memory
 from ..memory_import import classify, import_notes, split_sections
 from ..memory_tools import is_sensitive
 from ..selftest import TempDir, covers
-from .harness import X, T, is_overdrive_main, make_agent, run_task, tool_results, turn_index, with_fake
+from .harness import X, T, is_overdrive_main, make_agent, run_task, system_text, tool_results, turn_index, with_fake
 
 NOTES = {
     "CLAUDE.md": "# Memory\n\n## Rules\n- DEFAULT = YES: build what they ask.\n- No emojis in games. Real assets only.\n"
@@ -658,3 +658,49 @@ def test_done_chats():
         od.away.last_auto_done = ""
         od.away._auto_done_daily()                       # asks only once
         assert not od.conversations[c.id].done
+
+
+# ================================================================ Part 5: by the way box
+@covers(84, 100, cli=True, title="By the way: a side question is answered during a job, without touching the job")
+def test_e2e_by_the_way():
+    import asyncio
+    import time as _time
+
+    def go(tmp, fake):
+        od = make_agent(tmp, fake, mode="chat")
+        main_reqs, side_reqs = [], []
+
+        def script(req, f):
+            if "by the way" in system_text(req):
+                side_reqs.append(json_text(req))
+                return [X("Weight transfer = the car leans forward when braking.")]
+            if not is_overdrive_main(req):
+                return [X("ok")]
+            main_reqs.append(json_text(req))
+            return ("delay", 6, [X("Here is a long slow answer about building the night map, word by word, slowly.")])
+        fake.script = script
+
+        async def main():
+            od.events.bind_loop(asyncio.get_running_loop())
+            rec = await od.send("build me the night map plan")
+            await asyncio.sleep(0.5)
+            item = od.btw.ask("what is weight transfer?")
+            t0 = _time.monotonic()
+            while item["status"] == "thinking" and _time.monotonic() - t0 < 60:
+                await asyncio.sleep(0.1)
+            assert item["status"] == "done" and "leans forward" in item["a"], item
+            assert od.current is not None and od.current.rec.id == rec.id      # the main job is still going
+            while od.current is not None:
+                await asyncio.sleep(0.1)
+            done = od.task_store.load(rec.id)
+            assert done.status == "done" and "night map" in done.final_text
+            assert not any("weight transfer" in r for r in main_reqs)          # the main job never saw it
+            assert "night map plan" in side_reqs[0]                            # the side answer knew the job
+            assert "leans forward" not in done.final_text                      # not mixed into the main chat
+            try:
+                od.btw.ask("   ")
+                raise AssertionError("empty question should fail")
+            except ValueError:
+                pass
+        asyncio.run(main())
+    with_fake(lambda r, f: [X("ok")], go)

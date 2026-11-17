@@ -45,6 +45,7 @@
         <div class="bar-title" id="chat-title">New chat</div>
         <div class="bar-right">
           <span id="chip-model" class="chip"></span>
+          <button id="btw-toggle" class="ghost sm" title="Ask a quick side question without stopping the job (Ctrl+B)">By the way</button>
           <button id="stop" class="danger hidden" title="Stop the running task now">STOP</button>
         </div>
       </header>
@@ -62,6 +63,11 @@
           </div>
         </div>
       </div>
+      <aside id="btw" class="btw hidden" aria-label="By the way">
+        <div class="btw-head"><b>By the way</b><span class="muted">quick side questions, the main job keeps going</span><button class="bn-x" id="btw-x" title="Close">&times;</button></div>
+        <div id="btw-list" class="btw-list"></div>
+        <form id="btw-form" class="btw-form" autocomplete="off"><input id="btw-q" maxlength="4000" placeholder="Ask something quick..."><button class="primary sm">Ask</button></form>
+      </aside>
       <div id="queue-box" class="queue-box hidden"></div>
       <div id="voice-bar" class="voice-bar hidden" aria-live="polite">
         <div class="vb-orb" id="vb-orb"><i></i><i></i><i></i><b></b></div>
