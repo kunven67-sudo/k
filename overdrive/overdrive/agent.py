@@ -119,6 +119,9 @@ class Overdrive:
         register_memory_tools(self.tools)
         self.tools.add(START_BUILD_SPEC)
         self.pictures = PictureStore(self.paths.pictures)
+        from .away import Away
+        from .projects import Projects
+        self.projects = Projects(self.paths.workspace, self.paths.data)
         self.tools.add(SHOW_PICTURES_SPEC)
         self.grants = Grants()
         self.events = EventBus()
@@ -135,6 +138,7 @@ class Overdrive:
         self.startup_notes: list[str] = []      # shown once in the window (e.g. "I read your memory pack")
         self.queue: list[dict] = []             # Piece 3: messages you sent (typed or said) while it was busy
         self._queue_paused = False              # STOP pauses the queue until you send again
+        self.away = Away(self)
         self.removed_env = [] if test_env else brain.clean_env_for_plan()
         self.audit.on_write(lambda e: self.events.publish("log", entry={k: e[k] for k in ("seq", "ts", "kind", "task")}))
         self.audit.write("app_start", {
@@ -161,6 +165,7 @@ class Overdrive:
                             mode=self.default_mode)
         self.conversations[conv.id] = conv
         self._save_conversations()
+        self.events.publish("conversation", conversation=dict(conv.__dict__))
         return conv
 
     # ------------------------------------------------------------------ setup
@@ -200,12 +205,24 @@ class Overdrive:
     def busy(self) -> bool:
         return self.current is not None
 
-    async def send(self, text: str, conversation_id: str | None = None, mode: str | None = None) -> TaskRecord:
+    def background_running(self) -> bool:
+        return self.current is not None and self.current.rec.background
+
+    async def send(self, text: str, conversation_id: str | None = None, mode: str | None = None,
+                   background: bool = False) -> TaskRecord:
         text = (text or "").strip()
         if not text:
             raise ValueError("empty message")
         if len(text) > 20000:
             raise ValueError("message is too long (20,000 characters max)")
+        if self.current is not None and self.current.rec.background and not background:
+            # you always go first: its own learning run stops for your message
+            self.audit.write("background_stopped", {"task": self.current.rec.id, "why": "you sent a message"})
+            await self.stop()
+            for _ in range(150):
+                if self.current is None:
+                    break
+                await asyncio.sleep(0.1)
         if self.current is not None:
             raise Busy("OVERDRIVE is still working on the last task. Wait for it, or press STOP.")
         conv = self.conversations.get(conversation_id or "")
@@ -215,7 +232,7 @@ class Overdrive:
                 conv.mode = mode
         if conv.title == "New chat":
             conv.title = text[:60]
-        rec = TaskRecord(id=new_task_id(), conversation=conv.id, request=text)
+        rec = TaskRecord(id=new_task_id(), conversation=conv.id, request=text, background=background)
         rec.mode = conv.mode if conv.mode in ("chat", "build") else "chat"
         rec.settings = {k: self.settings.get(k) for k in ("model", "fallback_model", "effort", "detail", "max_steps",
                                                           "max_minutes", "task_budget_usd", "double_check")}

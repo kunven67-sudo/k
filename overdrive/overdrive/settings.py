@@ -53,6 +53,17 @@ DEFAULTS: dict[str, Any] = {
     "voice_pitch": 1.0,
     "voice_read": "voice_mode",  # read answers out loud: voice_mode (only in voice mode) / always / off
     "voice_moods": True,         # its voice follows its mood (a bit faster when excited, slower when sad)
+    # while you're away
+    "away_learn": True,          # learn when the PC is idle (uses a little usage, capped)
+    "away_learn_cap": 5,         # % of the 5-hour limit per day: 5 or 10 (your pick)
+    "away_bugs": True,           # bug hunt when the PC is idle (zero usage)
+    "bug_scope": "all",          # all projects / picked ones (done projects are always skipped)
+    "bug_picked": [],
+    "away_after_min": 10,        # "away" = no mouse or keyboard for this many minutes
+    "keep_running": True,        # keep working when the window is closed (Quit in Settings ends it)
+    "start_with_windows": False,
+    "auto_done": "ask",          # projects nobody touched for a while: always (mark done) / ask / never
+    "auto_done_days": 14,
 }
 
 _SCHEMA: dict[str, tuple] = {
@@ -81,6 +92,16 @@ _SCHEMA: dict[str, tuple] = {
     "voice_pitch": ((int, float), lambda v: 0.5 <= v <= 1.6, "Voice pitch"),
     "voice_read": (str, lambda v: v in ("voice_mode", "always", "off"), "Read answers out loud"),
     "voice_moods": (bool, None, "Voice follows its mood"),
+    "away_learn": (bool, None, "Learn while I'm away"),
+    "away_learn_cap": (int, lambda v: v in (5, 10), "Learning cap"),
+    "away_bugs": (bool, None, "Bug hunt while I'm away"),
+    "bug_scope": (str, lambda v: v in ("all", "picked"), "Bug hunt projects"),
+    "bug_picked": (list, lambda v: len(v) <= 200 and all(isinstance(x, str) and len(x) < 300 for x in v), "Picked projects"),
+    "away_after_min": (int, lambda v: 2 <= v <= 240, "Away after"),
+    "keep_running": (bool, None, "Keep running when the window is closed"),
+    "start_with_windows": (bool, None, "Start with Windows"),
+    "auto_done": (str, lambda v: v in ("always", "ask", "never"), "Done projects"),
+    "auto_done_days": (int, lambda v: 3 <= v <= 365, "Not touched for (days)"),
 }
 
 

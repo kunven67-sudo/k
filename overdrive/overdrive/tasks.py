@@ -64,6 +64,7 @@ class TaskRecord:
     mode: str = "build"          # "chat" or "build" (older tasks were all build-style)
     pictures: list[dict] = field(default_factory=list)   # Piece 2: pictures shown with this answer
     memory_changes: list[dict] = field(default_factory=list)   # Piece 3: "Saved to memory" + Undo
+    background: bool = False     # Piece 3: it started this by itself (learning while you're away)
 
     def public(self) -> dict:
         return asdict(self)

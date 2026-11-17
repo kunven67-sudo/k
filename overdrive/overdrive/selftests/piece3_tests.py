@@ -285,3 +285,169 @@ def test_voice_settings():
                 raise AssertionError(f"should refuse {bad}")
             except SettingsError:
                 pass
+
+
+# ================================================================ Part 3: while you're away
+def _png_header(w: int, h: int) -> bytes:
+    import struct as _s
+    import zlib as _z
+    ihdr = _s.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)
+    return b"\x89PNG\r\n\x1a\n" + _s.pack(">I", 13) + b"IHDR" + ihdr + _s.pack(">I", _z.crc32(b"IHDR" + ihdr) & 0xFFFFFFFF)
+
+
+def make_projects(ws: Path) -> None:
+    racer = ws / "games" / "racer"
+    racer.mkdir(parents=True)
+    (racer / "index.html").write_text('<script src="game.js"></script><img src="art/car.png"><a href="https://x.org">x</a>'
+                                      '<link rel="stylesheet" href="style.css">', encoding="utf-8")
+    (racer / "game.js").write_text("let speed = 1;\n", encoding="utf-8")
+    (racer / "style.css").write_text("body{}", encoding="utf-8")
+    (racer / "level.json").write_text('{"cars": [1, 2,]}', encoding="utf-8")
+    (racer / "sky.png").write_bytes(_png_header(8192, 4096))
+    (racer / "crash-01.dmp").write_bytes(b"MDMP")
+    (racer / "game.log").write_text("start\nTraceback (most recent call last):\n  boom\n", encoding="utf-8")
+    tool = ws / "apps" / "helper"
+    tool.mkdir(parents=True)
+    (tool / "main.py").write_text("def f(:\n    pass\n", encoding="utf-8")
+    (tool / "ok.py").write_text("print('fine')\n", encoding="utf-8")
+    (ws / "space-run").mkdir()
+    (ws / "space-run" / "main.py").write_text("x = 1\n", encoding="utf-8")
+
+
+@covers(16, 19, title="Bug hunt finds broken code, files, missing pictures, crashes and too-big pictures (fixes nothing)")
+def test_bug_hunt_checks():
+    from ..bughunt import BugBook, hunt_project
+    from ..projects import Projects
+    with TempDir() as tmp:
+        ws = tmp / "ws"
+        make_projects(ws)
+        before = {p: p.read_bytes() for p in ws.rglob("*") if p.is_file()}
+        pr = Projects(ws, tmp)
+        names = [p["name"] for p in pr.list()]
+        assert names == ["apps/helper", "games/racer", "space-run"], names
+        r = hunt_project(pr.folder("games/racer"), "games/racer")
+        kinds = sorted(b["kind"] for b in r["bugs"])
+        assert kinds == ["crash", "heavy", "json", "log", "missing"], r["bugs"]
+        assert any("art/car.png" in b["message"] for b in r["bugs"])
+        h = hunt_project(pr.folder("apps/helper"), "apps/helper")
+        assert len(h["bugs"]) == 1 and h["bugs"][0]["kind"] == "syntax" and h["bugs"][0]["line"] == 1, h
+        assert hunt_project(pr.folder("space-run"), "space-run")["bugs"] == []
+        assert before == {p: p.read_bytes() for p in ws.rglob("*") if p.is_file()}   # it only looks
+        book = BugBook(tmp)
+        c = book.record("games/racer", r["bugs"])
+        assert c["new"] == 5 and c["open"] == 5
+        assert book.record("games/racer", r["bugs"])["new"] == 0                        # same bugs: not new again
+        (ws / "games" / "racer" / "level.json").write_text('{"cars": [1, 2]}', encoding="utf-8")
+        c2 = book.record("games/racer", hunt_project(pr.folder("games/racer"), "games/racer")["bugs"])
+        assert c2["fixed"] == 1 and c2["open"] == 4, c2
+        heavy = [b for b in book.open_bugs() if b["kind"] == "heavy"][0]
+        assert book.dismiss(heavy["id"])
+        c3 = book.record("games/racer", hunt_project(pr.folder("games/racer"), "games/racer")["bugs"])
+        assert c3["new"] == 0 and c3["open"] == 3, c3                                   # "not a bug" stays hidden
+
+
+@covers(45, title="Projects: Done switch, and old projects get marked done (or asked about)")
+def test_projects_done():
+    import os
+    import time as _time
+    from ..projects import Projects
+    with TempDir() as tmp:
+        ws = tmp / "ws"
+        make_projects(ws)
+        old = _time.time() - 40 * 86400
+        for p in (ws / "space-run").rglob("*"):
+            os.utime(p, (old, old))
+        pr = Projects(ws, tmp)
+        assert pr.auto_done("never", 14) == {"marked": [], "ask": []}
+        assert pr.auto_done("ask", 14)["ask"] == ["space-run"]
+        assert pr.auto_done("ask", 14)["ask"] == []                 # asks only once
+        assert pr.auto_done("always", 14)["marked"] == ["space-run"] and pr.is_done("space-run")
+        pr.set_done("space-run", False)
+        assert not Projects(ws, tmp).is_done("space-run")           # saved
+        try:
+            pr.set_done("nope", True)
+            raise AssertionError("unknown project should fail")
+        except ValueError:
+            pass
+
+
+@covers(80, 84, cli=True, title="Away: bug hunt + learning with the daily cap, a report when you're back, you go first")
+def test_e2e_away_learn_and_hunt():
+    import asyncio
+    import time as _time
+
+    def go(tmp, fake):
+        od = make_agent(tmp, fake, mode="chat")
+        make_projects(od.paths.workspace)
+        od.projects.set_done("space-run", True)
+        idle = {"s": 0.0}
+        od.away.idle_fn = lambda: idle["s"]
+
+        def script(req, f):
+            if not is_overdrive_main(req):
+                return [X("ok")]
+            users = json_text(req)
+            if "LEARN TIME" in users:
+                i = turn_index(req)
+                if i == 0:
+                    return [T("memory_remember", kind="fact", title="Cars feel heavy with weight transfer",
+                              content="Shift weight forward when braking.", tags=["learned", "cars"], reason="learned")]
+                return ("delay", 3, [X("I learned how weight transfer makes cars feel heavy. Helps your racer.")])
+            return [X("Hi! I'm here.")]
+        fake.script = script
+
+        async def main():
+            od.events.bind_loop(asyncio.get_running_loop())
+            events = []
+            q, _ = od.events.subscribe(0)
+            await od.away.tick()
+            assert not od.away.away                                   # you're here
+            idle["s"] = 3600.0
+            await od.away.tick()
+            assert od.away.away and od.away.learn_task_id, od.away.public()
+            rec = od.current.rec
+            assert rec.background and od.conversations[rec.conversation].title == "While you were away"
+            assert od.conversations[rec.conversation].model == "sonnet"
+            deadline = _time.monotonic() + 90
+            while (od.current is not None or (od.away.hunt_task and not od.away.hunt_task.done())) and _time.monotonic() < deadline:
+                await asyncio.sleep(0.1)
+            await od.away.tick()                                       # notices the learning run ended
+            await od.away.tick()                                       # second project
+            while od.away.hunt_task and not od.away.hunt_task.done():
+                await asyncio.sleep(0.1)
+            await od.away.tick()
+            while od.away.hunt_task and not od.away.hunt_task.done():
+                await asyncio.sleep(0.1)
+            assert od.away.learn_used_today() == 2.5, od.away.learn_used_today()   # no meter reported: counted as 2.5%
+            assert not od.away.can_learn()[0]                          # not again right away
+            idle["s"] = 1.0
+            await od.away.tick()
+            rep = od.away.state["reports"][-1]
+            assert rep["learned"] == ["Cars feel heavy with weight transfer"], rep
+            assert sorted(rep["checked"]) == ["apps/helper", "games/racer"], rep   # done project skipped
+            assert rep["bugs_new"] == 6 and not rep["seen"], rep
+            while not q.empty():
+                events.append(q.get_nowait()["type"])
+            assert "away_report" in events
+            # the cap: 10% allows more, 5% used up stops it
+            od.away.state["learn_days"][__import__("overdrive.away", fromlist=["x"])._today()] = {"pct": 5.0, "runs": 2}
+            od.away.state["last_learn"] = 0
+            assert "cap" in od.away.can_learn()[1]
+            od.settings.update({"away_learn_cap": 10}, by="test")
+            assert od.away.can_learn()[0]
+            # you go first: your message stops its own learning run
+            idle["s"] = 3600.0
+            await od.away.tick()
+            assert od.current is not None and od.current.rec.background
+            mine = await od.send("hey are you there", None)
+            assert not mine.background
+            while od.current is not None:
+                await asyncio.sleep(0.1)
+            assert od.task_store.load(mine.id).status == "done"
+        asyncio.run(main())
+    with_fake(lambda r, f: [X("ok")], go)
+
+
+def json_text(req) -> str:
+    import json as _json
+    return _json.dumps(req.get("messages", []))

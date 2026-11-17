@@ -112,6 +112,7 @@ class Server:
             "home": str(od.paths.home),
             "notes": list(od.startup_notes),
             "queue": list(od.queue),
+            "away": od.away.public(),
             "memory_counts": od.memory.counts(),
         }
 
@@ -132,6 +133,7 @@ class Server:
             ("/api/chat/search", self.chat_search, ["GET"]), ("/api/open", self.open, ["POST"]), ("/api/quit", self.quit, ["POST"]),
             # Piece 3: memory page
             ("/api/queue", self.queue_action, ["POST"]),
+            ("/api/away", self.away_page, ["GET"]), ("/api/away/action", self.away_action, ["POST"]),
             ("/api/memory", self.memory_page, ["GET"]), ("/api/memory/edit", self.memory_edit, ["POST"]),
             ("/api/memory/set", self.memory_set, ["POST"]), ("/api/memory/forget", self.memory_forget, ["POST"]),
             ("/api/memory/import", self.memory_import, ["POST"]), ("/api/memory/undo", self.memory_undo, ["POST"]),
@@ -215,7 +217,7 @@ class Server:
         return JSONResponse({"conversation": conv.__dict__, "tasks": tasks})
 
     async def new_chat(self, request: Request) -> Response:
-        if self.od.busy():
+        if self.od.busy() and not self.od.background_running():
             return JSONResponse({"error": "Wait until the running task is finished."}, 409)
         return JSONResponse({"conversation": self.od.new_conversation().__dict__})
 
@@ -236,6 +238,46 @@ class Server:
         except ValueError as e:
             return JSONResponse({"error": str(e)}, 400)
         return JSONResponse({"task": rec.public()})
+
+    # ------------------------------------------------------------------ while you're away (Piece 3)
+    async def away_page(self, request: Request) -> Response:
+        od = self.od
+        projects = await asyncio.to_thread(od.projects.list)
+        bugs = od.away.bugs.open_bugs()
+        per = {}
+        for b in bugs:
+            per[b["project"]] = per.get(b["project"], 0) + 1
+        for p in projects:
+            p["bugs"] = per.get(p["name"], 0)
+            p["checked"] = (od.away.bugs.data.get(p["name"]) or {}).get("checked")
+        learned = [r.to_dict() for r in od.memory.list(("fact", "experience"), limit=200) if "learned" in r.tags][:40]
+        ok, why = od.away.can_learn()
+        return JSONResponse({"away": od.away.public(), "projects": projects, "bugs": bugs[:500], "learned": learned,
+                             "can_learn": ok, "why_not": why, "five_hour": od.away.five_hour()})
+
+    async def away_action(self, request: Request) -> Response:
+        b = await self._json(request)
+        act, od = str(b.get("action") or ""), self.od
+        try:
+            if act == "done":
+                res = od.projects.set_done(str(b.get("project") or ""), bool(b.get("done")))
+                od.audit.write("project_done", {"project": res["name"], "done": res.get("done"), "by": "you"})
+            elif act == "check":
+                res = await od.away.hunt_now(str(b.get("project") or ""))
+            elif act == "dismiss":
+                res = {"ok": od.away.bugs.dismiss(str(b.get("bug") or ""))}
+            elif act == "seen":
+                od.away.mark_seen()
+                res = {"ok": True}
+            elif act == "learn_now":
+                if od.current is not None:
+                    return JSONResponse({"error": "Wait until the running task is finished."}, 409)
+                res = {"task": await od.away.start_learning()}
+            else:
+                return JSONResponse({"error": "unknown action"}, 400)
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, 400)
+        return JSONResponse(res)
 
     async def queue_action(self, request: Request) -> Response:
         b = await self._json(request)
@@ -366,6 +408,11 @@ class Server:
             return JSONResponse({"error": str(e)}, 400)
         if "cli_path" in diff:
             await self.od.check_setup(force=True)
+        if "start_with_windows" in diff:
+            from .autostart import apply
+            note = apply(bool(diff["start_with_windows"][1]))
+            if note:
+                return JSONResponse({"changed": diff, "settings": self.od.settings.all(), "note": note})
         return JSONResponse({"changed": diff, "settings": self.od.settings.all()})
 
     async def tool_run(self, request: Request) -> Response:
@@ -498,6 +545,8 @@ class Server:
         while not self.should_exit.is_set():
             await asyncio.sleep(5)
             idle = time.monotonic() - self.last_stream_seen
+            if self.od.settings.get("keep_running"):
+                continue      # Piece 3: it keeps working while you're away (Settings > Quit ends it)
             if self.streams == 0 and idle > idle_s and not self.od.busy() and not self.selftest_running:
                 self.od.audit.write("app_quit", {"by": "window closed"})
                 self.should_exit.set()
@@ -590,10 +639,12 @@ async def serve(od: Overdrive, open_ui: bool = True) -> None:
         await asyncio.sleep(0.3)
         open_window(url, od.paths.data / "window-profile")
     idle_task = asyncio.create_task(server.watch_idle())
+    away_task = asyncio.create_task(od.away.run())
     try:
         await server.should_exit.wait()
     finally:
         idle_task.cancel()
+        away_task.cancel()
         if od.busy():
             await od.stop()
         userver.should_exit = True

@@ -74,6 +74,16 @@ DEMO_NOTES = {
 }
 
 
+DEMO_PROJECTS = {
+    "games/street-racer/index.html": '<script src="game.js"></script><img src="art/car.png">',
+    "games/street-racer/game.js": "let speed = 0;\nfunction drive() { speed += 1; }\n",
+    "games/street-racer/level.json": '{"cars": ["red", "blue",]}',
+    "games/street-racer/game.log": "loading\nTraceback (most recent call last):\n  File game.py, line 3\nKeyError: 'night'\n",
+    "games/space-shooter/main.py": "def shoot(:\n    pass\n",
+    "apps/todo-helper/main.py": "print('todo')\n",
+}
+
+
 def script(req: dict, fake: FakeClaude):
     if "check other AI work" in system_text(req):
         return [X('{"status": "done", "reason": "The journal shows todo.txt was created with 3 items, matching the goal."}')]
@@ -83,6 +93,14 @@ def script(req: dict, fake: FakeClaude):
     i = turn_index(req)
     everything = json.dumps(req.get("messages", [])).lower()
     building = "MODE: BUILD" in system_text(req) or "mode: build" in everything
+    if "learn time" in everything:
+        steps = [
+            [T("memory_remember", kind="fact", title="Real car sounds: record engine, intake and exhaust apart",
+               content="Racing games sound real when engine, intake and exhaust are recorded separately and mixed by RPM.",
+               tags=["learned", "sound"], reason="learned while you were away")],
+            [X("I learned how racing games get real engine sounds: three recordings mixed by RPM. Good for your racer.")],
+        ]
+        return steps[i] if i < len(steps) else [X("Done.")]
     if "scary" in ask and not building:
         return [X("Okay, the scary version: the lights went out, and the engine kept running by itself.")] if i == 0 else [X("Done.")]
     if "story" in ask and not building:
@@ -201,6 +219,24 @@ async def main() -> None:
         f.parent.mkdir(parents=True, exist_ok=True)
         f.write_text(text, encoding="utf-8")
     print(f"NOTES {notes}", flush=True)
+    # Demo projects for the While-away page, and a file that says how long "you" have been away
+    ws = od.paths.workspace
+    for rel, text in DEMO_PROJECTS.items():
+        f = ws / rel
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(text, encoding="utf-8")
+    idle_file = root / "idle.txt"
+    idle_file.write_text("0")
+    print(f"IDLE {idle_file}", flush=True)
+
+    def idle() -> float:
+        try:
+            return float(idle_file.read_text() or 0)
+        except (OSError, ValueError):
+            return 0.0
+    od.away.idle_fn = idle
+    from overdrive.away import Away
+    od.away.run = lambda: Away.run(od.away, every=1.0)
     if a.no_cli:
         od.test_env = None  # show the real first-run screen
     selftest.CLI = cli or None

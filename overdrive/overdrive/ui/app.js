@@ -218,7 +218,9 @@ function handle(ev) {
     case "conversation": {
       const list = S.state.conversations || [];
       const c = list.find((x) => x.id === ev.conversation.id);
+      const oldTitle = c && c.title;
       if (c) Object.assign(c, ev.conversation); else list.unshift(ev.conversation);
+      if (!c || oldTitle !== ev.conversation.title) renderChats();
       renderMode();
       try { renderModelChip(); } catch (e) { /* not ready yet */ }
       break;

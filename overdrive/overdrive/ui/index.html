@@ -20,6 +20,7 @@
     <nav id="nav">
       <button data-tab="chat" class="on"><span class="ic ic-chat"></span>Chat</button>
       <button data-tab="memory"><span class="ic ic-brain"></span>Memory <span id="nav-mem" class="pill"></span></button>
+      <button data-tab="away"><span class="ic ic-moon"></span>While away <span id="nav-away" class="pill"></span></button>
       <button data-tab="status"><span class="ic ic-grid"></span>Status <span id="nav-points" class="pill"></span></button>
       <button data-tab="logs"><span class="ic ic-log"></span>Logs</button>
       <button data-tab="tools"><span class="ic ic-tool"></span>Tools</button>
@@ -45,6 +46,7 @@
         </div>
       </header>
       <div id="needs-you" class="needs hidden"></div>
+      <div id="banners"></div>
       <div id="feed">
         <div id="empty" class="empty">
           <img src="/static/logo.svg" alt="" class="big-mark">
@@ -87,6 +89,14 @@
       </header>
       <div id="mem-cats" class="mem-cats"></div>
       <div class="scroll" id="mem-body"><div class="loading">Loading...</div></div>
+    </section>
+
+    <!-- WHILE AWAY (Piece 3) -->
+    <section id="tab-away" class="tab">
+      <header class="bar"><div class="bar-title">While you're away</div>
+        <div class="bar-right"><span id="away-chip" class="chip"></span><button id="learn-now" class="ghost">Learn something now</button></div>
+      </header>
+      <div class="scroll" id="away-body"><div class="loading">Loading...</div></div>
     </section>
 
     <!-- STATUS -->

@@ -20,6 +20,8 @@ function start(port, ...extra) {
       const m = buf.match(/URL (\S+)/);
       const nm = buf.match(/NOTES (.+)/);
       if (nm) p.notes = nm[1].trim();
+      const im = buf.match(/IDLE (.+)/);
+      if (im) p.idle = im[1].trim();
       if (m && !p.ready) {
         p.ready = true;
         clearTimeout(t);
@@ -322,6 +324,36 @@ function start(port, ...extra) {
     await vp.click("#save-settings");
     await vp.waitForSelector("#set-msg:has-text('Saved')", { timeout: 5000 });
     await vp.close();
+
+    // ---- Piece 3, part 3: while you're away
+    await page.click("#nav [data-tab=away]");
+    await page.waitForSelector(".ptbl >> text=games/street-racer", { timeout: 8000 });
+    assert((await page.$$(".ptbl tbody tr")).length === 3, "3 projects");
+    await page.click(".ptbl tr:has-text('games/street-racer') [data-pcheck]");
+    await page.waitForSelector(".bug-group >> text=Points to a file that isn't there", { timeout: 10000 });
+    assert((await page.$$(".bug-group .bug")).length === 3, "3 bugs in the racer (missing picture, json, log)");
+    await page.click(".bug:has-text('error line') [data-bugx]");
+    await page.waitForFunction(() => document.querySelectorAll(".bug-group .bug").length === 2, null, { timeout: 5000 });
+    await page.click("[data-seg=away_learn_cap][data-v='10']");
+    await page.waitForSelector("[data-seg=away_learn_cap][data-v='10'].on", { timeout: 5000 });
+    await page.check(".ptbl tr:has-text('apps/todo-helper') [data-pdone]");
+    await page.waitForSelector(".ptbl tr.pdone >> text=apps/todo-helper", { timeout: 5000 });
+    fs.writeFileSync(srv.idle, "3600");                          // "you" walk away
+    await page.waitForSelector("#away-chip:has-text('Away')", { timeout: 15000 });
+    await page.waitForSelector(".lrn >> text=Real car sounds", { timeout: 40000 });
+    await page.waitForFunction(() => /Away$/.test(document.querySelector("#away-chip").textContent) && !S.state.current, null, { timeout: 30000 });
+    await shot(page, "16-while-away.png");
+    fs.writeFileSync(srv.idle, "0");                             // "you" come back
+    await page.click("#nav [data-tab=chat]");
+    await page.waitForSelector(".banner.away >> text=While you were away", { timeout: 15000 });
+    const bn = await page.innerText(".banner.away");
+    assert(bn.includes("learned 1 thing") && bn.includes("new bug"), "away report: " + bn);
+    await shot(page, "17-away-banner.png");
+    await page.click(".banner.away .bn-x");
+    await page.waitForSelector(".banner.away", { state: "detached", timeout: 3000 });
+    await page.reload();
+    await page.waitForSelector("#brain-text:has-text('signed in')", { timeout: 20000 });
+    assert(!(await page.$(".banner.away")), "closed banner stays closed");
   } catch (e) {
     errors.push(String(e && e.stack || e));
   } finally {

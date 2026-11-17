@@ -10,6 +10,9 @@ const P3 = {
 P3.state = function (st) {
   P3.paintMemCount(st.memory_counts);
   P3.renderQueue(st.queue);
+  P3.paintAwayChip(st.away);
+  const last = st.away && (st.away.reports || []).slice(-1)[0];
+  if (last && !last.seen) P3.awayReport(last);
   const notes = st.notes || [];
   for (const n of notes) {
     const key = "od_note_" + n;
@@ -27,12 +30,16 @@ P3.event = function (ev) {
       else P3.refreshMemCount();
       break;
     case "queue": if (S.state) S.state.queue = ev.queue; P3.renderQueue(ev.queue); break;
+    case "away": P3.paintAwayChip(ev.away); if (S.tab === "away") P3.loadAway(); break;
+    case "away_report": P3.awayReport(ev.report); if (S.tab === "away") P3.loadAway(); break;
+    case "projects_done": P3.askDone(ev.ask); if (ev.marked && ev.marked.length) toast(`Marked done (nobody touched them): ${ev.marked.join(", ")}`, "ok", 8000); break;
     default: break;
   }
 };
 
 P3.tab = function (tab) {
   if (tab === "memory") P3.loadMemory();
+  if (tab === "away") P3.loadAway();
 };
 
 /* extra bits under an answer: "Saved to memory" with Undo */
@@ -89,6 +96,13 @@ P3.bind = function () {
   });
   $("#settings-body").addEventListener("input", (e) => { const k = e.target.dataset && e.target.dataset.k; if (k && e.target.type === "range") { const b = $(`[data-rv="${k}"]`); if (b) b.textContent = Number(e.target.value).toFixed(2) + "x"; } });
   $("#queue-box").addEventListener("click", P3.queueClick);
+  $("#away-body").addEventListener("click", P3.awayClick);
+  $("#away-body").addEventListener("change", P3.awayChange);
+  $("#banners").addEventListener("click", P3.bannerClick);
+  $("#learn-now").addEventListener("click", async () => {
+    try { await api("/api/away/action", { action: "learn_now" }); toast("It's learning something now (in the \u201cWhile you were away\u201d chat).", "ok", 5000); P3.loadAway(); }
+    catch (e) { toast(e.message, "bad"); }
+  });
   $("#mic").addEventListener("click", P3.toggleDictation);
   $("#voice").addEventListener("click", P3.toggleVoice);
   $("#vb-mute").addEventListener("click", P3.toggleMute);
@@ -526,4 +540,175 @@ P3.shush = function () {
   P3.v.current = null;
   if (window.speechSynthesis) speechSynthesis.cancel();
   if (P3.v.speaking) { P3.v.speaking = false; P3.paintVoice(); setTimeout(P3.listen, 250); }
+};
+
+/* ================================================================ Part 3: while you're away */
+P3.away = { data: null };
+P3.setNow = async function (changes) {
+  try {
+    const r = await api("/api/settings", { changes });
+    S.state.settings = r.settings;
+    if (r.note) toast(r.note, "warn", 9000);
+    return true;
+  } catch (e) { toast(e.message, "bad"); return false; }
+};
+P3.loadAway = async function () {
+  try { P3.away.data = await api("/api/away"); } catch (e) { $("#away-body").innerHTML = `<div class="err">${esc(e.message)}</div>`; return; }
+  P3.renderAway();
+};
+P3.ago = function (iso) {
+  if (!iso) return "never";
+  const s = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (s < 90) return "just now";
+  if (s < 5400) return `${Math.round(s / 60)} min ago`;
+  if (s < 129600) return `${Math.round(s / 3600)} h ago`;
+  return `${Math.round(s / 86400)} days ago`;
+};
+P3.paintAwayChip = function (a) {
+  if (!a) return;
+  const chip = $("#away-chip");
+  if (chip) chip.textContent = a.away ? (a.hunting ? `Away: checking ${a.hunting}` : a.learning ? "Away: learning" : "Away") : "You're here";
+  $("#nav-away").textContent = a.bugs_open ? String(a.bugs_open) : "";
+};
+P3.renderAway = function () {
+  const d = P3.away.data, s = S.state.settings, a = d.away;
+  P3.paintAwayChip(a);
+  const used = a.learn_used_pct, cap = a.learn_cap_pct, pct = Math.min(100, (used / cap) * 100);
+  const sw = (k, label) => `<label class="switch big"><input type="checkbox" data-now="${k}" ${s[k] ? "checked" : ""}><span>${esc(label)}</span></label>`;
+  const seg = (k, vals) => `<span class="seg">${vals.map(([v, l]) => `<button data-seg="${k}" data-v="${esc(String(v))}" class="${String(s[k]) === String(v) ? "on" : ""}">${esc(l)}</button>`).join("")}</span>`;
+  const projects = d.projects.map((p) => `<tr class="${p.done ? "pdone" : ""}">
+      <td><b>${esc(p.name)}</b>${p.done ? ` <span class="chip">done</span>` : ""}</td>
+      <td class="muted">${p.changed_days == null ? "-" : p.changed_days < 1 ? "today" : Math.round(p.changed_days) + " days ago"}</td>
+      <td>${p.bugs ? `<span class="bugn">${p.bugs}</span>` : `<span class="muted">0</span>`}</td>
+      <td class="muted">${esc(P3.ago(p.checked))}</td>
+      ${s.bug_scope === "picked" ? `<td><input type="checkbox" data-pick="${esc(p.name)}" ${(s.bug_picked || []).includes(p.name) ? "checked" : ""} ${p.done ? "disabled" : ""}></td>` : ""}
+      <td><label class="switch"><input type="checkbox" data-pdone="${esc(p.name)}" ${p.done ? "checked" : ""}> done</label></td>
+      <td><button class="ghost xs" data-pcheck="${esc(p.name)}" ${p.done ? "disabled" : ""}>Check now</button></td></tr>`).join("");
+  const groups = {};
+  for (const b of d.bugs) (groups[b.project] = groups[b.project] || []).push(b);
+  const bugs = Object.entries(groups).map(([proj, list]) => `<div class="bug-group"><h4>${esc(proj)} <span class="muted">${list.length}</span></h4>
+      ${list.map((b) => `<div class="bug ${esc(b.severity)}"><span class="sev">${b.severity === "bug" ? "Bug" : "Heads up"}</span>
+        <span class="mono bf">${esc(b.file.split("/").slice(1).join("/") || b.file)}${b.line ? ":" + b.line : ""}</span><span class="bm">${esc(b.message)}</span>
+        <button class="ghost xs" data-bugx="${esc(b.id)}" title="Not a bug: hide it">Not a bug</button></div>`).join("")}</div>`).join("");
+  const learned = d.learned.map((r) => `<div class="lrn"><b>${esc(r.title)}</b><div class="muted">${esc(r.content.slice(0, 220))}${r.content.length > 220 ? "..." : ""}</div></div>`).join("");
+  const reports = (a.reports || []).slice().reverse().slice(0, 6).map((r) => `<div class="rep"><span class="muted">${esc(new Date(r.from).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }))} &middot; ${r.minutes} min away</span>
+      <span>${P3.reportLine(r)}</span></div>`).join("");
+  $("#away-body").innerHTML = `
+    ${a.idle_known ? "" : `<div class="box muted" style="margin-bottom:14px">This PC can't tell when you're away (this works on Windows), so nothing here runs by itself. "Check now" and "Learn something now" still work.</div>`}
+    <div class="away-cards">
+      <div class="acard ${s.away_learn ? "on" : ""}"><div class="ac-head">${sw("away_learn", "Learn")}<span class="cost">uses a little usage</span></div>
+        <p class="muted">It picks a topic that helps your projects (or something it wants to get better at), reads about it, and saves a few short lessons to memory.</p>
+        <div class="row-i"><span>Daily cap</span>${seg("away_learn_cap", [[5, "5% a day"], [10, "10% a day"]])}</div>
+        <div class="capbar"><i data-w="${pct.toFixed(1)}"></i></div>
+        <div class="muted capline">Today: ${used.toFixed(1)}% of ${cap}% of your 5-hour limit${d.five_hour != null ? ` &middot; your 5-hour meter is at ${Math.round(d.five_hour)}%` : ""}${!d.can_learn && s.away_learn ? ` &middot; <i>waiting: ${esc(d.why_not)}</i>` : ""}</div>
+      </div>
+      <div class="acard ${s.away_bugs ? "on" : ""}"><div class="ac-head">${sw("away_bugs", "Bug hunt")}<span class="cost free">zero usage</span></div>
+        <p class="muted">Checks your projects on this PC: code that won't compile, broken files, missing pictures and sounds, error logs, crash files, pictures too big for your graphics card. It only looks, it never changes anything.</p>
+        <div class="row-i"><span>Which projects</span>${seg("bug_scope", [["all", "All"], ["picked", "Only the ones I pick"]])}</div>
+        <div class="muted capline">Done projects are always skipped.</div>
+      </div>
+    </div>
+    <div class="st-sec away-opts">
+      <div class="row2"><label>I'm away after</label><select data-now-sel="away_after_min">${[5, 10, 15, 30, 60].map((m) => `<option value="${m}" ${s.away_after_min === m ? "selected" : ""}>${m} minutes with no mouse or keyboard</option>`).join("")}</select></div>
+      <div class="row2"><label>When I close the window</label>${sw("keep_running", "keep working in the background (Settings > Quit stops it)")}</div>
+      <div class="row2"><label>Start with Windows</label>${sw("start_with_windows", "starts hidden, so it can work while you're away and pick up after a power cut")}</div>
+      <div class="row2"><label>Projects nobody touched for</label><span class="inl"><select data-now-sel="auto_done_days">${[7, 14, 30, 60].map((n) => `<option value="${n}" ${s.auto_done_days === n ? "selected" : ""}>${n} days</option>`).join("")}</select>
+        <select data-now-sel="auto_done">${[["ask", "ask me if they're done"], ["always", "mark them done by itself"], ["never", "leave them alone"]].map(([v, l]) => `<option value="${v}" ${s.auto_done === v ? "selected" : ""}>${l}</option>`).join("")}</select></span></div>
+    </div>
+    <h2>Your projects</h2>
+    ${d.projects.length ? `<table class="tbl ptbl"><thead><tr><th>Project</th><th>Changed</th><th>Bugs</th><th>Checked</th>${s.bug_scope === "picked" ? "<th>Pick</th>" : ""}<th>Done</th><th></th></tr></thead><tbody>${projects}</tbody></table>`
+      : `<div class="box muted">No projects in the workspace yet. Every game or app it builds gets its own folder there.</div>`}
+    <h2>Bugs it found ${d.bugs.length ? `<span class="muted" style="font-weight:400;font-size:13px">${d.bugs.length} open</span>` : ""}</h2>
+    ${d.bugs.length ? `<div class="btns" style="margin-bottom:10px"><button class="primary" id="bugs-explain">Explain these (uses a little usage)</button><button class="ghost" id="bugs-fix">Fix them (Build mode)</button></div>${bugs}`
+      : `<div class="box muted">No open bugs. The hunt runs while you're away, or press Check now on a project.</div>`}
+    <h2>What it learned</h2>${learned || `<div class="box muted">Nothing yet. It learns while you're away (when Learn is on).</div>`}
+    ${reports ? `<h2>While you were away</h2><div class="box">${reports}</div>` : ""}`;
+  applyWidths($("#away-body"));
+};
+P3.reportLine = function (r) {
+  const bits = [];
+  if (r.learned && r.learned.length) bits.push(`learned ${r.learned.length} thing${r.learned.length === 1 ? "" : "s"}`);
+  if (r.bugs_new) bits.push(`found ${r.bugs_new} new bug${r.bugs_new === 1 ? "" : "s"}`);
+  if (r.bugs_fixed) bits.push(`${r.bugs_fixed} old bug${r.bugs_fixed === 1 ? " is" : "s are"} gone`);
+  if (r.checked && r.checked.length && !r.bugs_new) bits.push(`checked ${r.checked.length} project${r.checked.length === 1 ? "" : "s"}, nothing new`);
+  return bits.join(", ") || "nothing new";
+};
+P3.awayClick = async function (e) {
+  const t = e.target;
+  const segB = t.closest("[data-seg]");
+  if (segB) { const k = segB.dataset.seg, v = segB.dataset.v; if (await P3.setNow({ [k]: k === "away_learn_cap" ? Number(v) : v })) P3.loadAway(); return; }
+  const chk = t.closest("[data-pcheck]");
+  if (chk) {
+    chk.disabled = true; chk.textContent = "Checking...";
+    try { const r = await api("/api/away/action", { action: "check", project: chk.dataset.pcheck }); toast(`Checked ${r.files} files: ${r.new} new, ${r.open} open${r.fixed ? `, ${r.fixed} fixed` : ""}.`, r.new ? "warn" : "ok", 6000); }
+    catch (err) { toast(err.message, "bad"); }
+    P3.loadAway(); return;
+  }
+  const x = t.closest("[data-bugx]");
+  if (x) { try { await api("/api/away/action", { action: "dismiss", bug: x.dataset.bugx }); } catch (err) { toast(err.message, "bad"); } P3.loadAway(); return; }
+  if (t.id === "bugs-explain" || t.id === "bugs-fix") {
+    const list = P3.away.data.bugs.slice(0, 40).map((b) => `- ${b.file}${b.line ? ":" + b.line : ""}: ${b.message}`).join("\n");
+    const fix = t.id === "bugs-fix";
+    switchTab("chat"); newChat();
+    if (fix) { S.nextMode = "build"; renderMode(); }
+    $("#msg").value = (fix ? "Fix these bugs your bug hunt found (check each one first, it might be a false alarm):\n" : "Explain these bugs your bug hunt found, simply, and which ones matter most:\n") + list;
+    autoGrow(); $("#msg").focus();
+  }
+};
+P3.awayChange = async function (e) {
+  const t = e.target;
+  if (t.dataset.now) { await P3.setNow({ [t.dataset.now]: t.checked }); P3.loadAway(); return; }
+  if (t.dataset.nowSel) { await P3.setNow({ [t.dataset.nowSel]: /^\d+$/.test(t.value) ? Number(t.value) : t.value }); P3.loadAway(); return; }
+  if (t.dataset.pdone) {
+    try { await api("/api/away/action", { action: "done", project: t.dataset.pdone, done: t.checked }); toast(t.checked ? "Marked done: the bug hunt skips it now." : "Not done anymore.", "ok", 3000); }
+    catch (err) { toast(err.message, "bad"); }
+    P3.loadAway(); return;
+  }
+  if (t.dataset.pick) {
+    const cur = new Set(S.state.settings.bug_picked || []);
+    if (t.checked) cur.add(t.dataset.pick); else cur.delete(t.dataset.pick);
+    await P3.setNow({ bug_picked: Array.from(cur) });
+  }
+};
+
+/* banners at the top of the chat: they stay until you press X (so you see them even if you were away) */
+P3.banners = new Map();
+P3.banner = function (id, html, kind) {
+  P3.banners.set(id, { html, kind: kind || "" });
+  P3.paintBanners();
+};
+P3.paintBanners = function () {
+  const box = $("#banners");
+  if (!box) return;
+  box.innerHTML = Array.from(P3.banners.entries()).map(([id, b]) => `<div class="banner ${esc(b.kind)}" data-bn="${esc(id)}">${b.html}<button class="bn-x" data-bnx="${esc(id)}" title="Close">&times;</button></div>`).join("");
+};
+P3.bannerClick = async function (e) {
+  const x = e.target.closest("[data-bnx]");
+  if (x) {
+    const id = x.dataset.bnx;
+    P3.banners.delete(id); P3.paintBanners();
+    if (id === "away") { try { await api("/api/away/action", { action: "seen" }); } catch (err) { /* closed */ } }
+    if (P3.onBannerClose) P3.onBannerClose(id);
+    return;
+  }
+  const go = e.target.closest("[data-go]");
+  if (go) switchTab(go.dataset.go);
+  const pd = e.target.closest("[data-askdone]");
+  if (pd) {
+    const [name, yes] = [pd.dataset.askdone, pd.dataset.yes === "1"];
+    if (yes) { try { await api("/api/away/action", { action: "done", project: name, done: true }); } catch (err) { toast(err.message, "bad"); } }
+    P3.banners.delete("done:" + name); P3.paintBanners();
+  }
+};
+P3.awayReport = function (r) {
+  if (!r || r.seen) return;
+  P3.banner("away", `<span class="bn-ic moon"></span><div><b>While you were away</b> (${r.minutes} min): ${esc(P3.reportLine(r))}.
+    ${r.learned && r.learned.length ? `<div class="muted">Learned: ${r.learned.slice(0, 3).map(esc).join(" &middot; ")}</div>` : ""}</div>
+    <button class="ghost sm" data-go="away">See it</button>`, "away");
+};
+P3.askDone = function (names) {
+  for (const n of names || []) {
+    P3.banner("done:" + n, `<span class="bn-ic"></span><div>Is <b>${esc(n)}</b> done? Nobody touched it for a while. Done projects skip the bug hunt.</div>
+      <button class="ghost sm" data-askdone="${esc(n)}" data-yes="1">Yes, it's done</button><button class="ghost sm" data-askdone="${esc(n)}" data-yes="0">Not done</button>`);
+  }
 };

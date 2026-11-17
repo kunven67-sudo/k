@@ -30,14 +30,16 @@ def _run_app() -> int:
     from .paths import default_home
     from .server import existing_instance, open_window, serve
     home = default_home()
+    background = "--background" in sys.argv[1:]      # started with Windows: no window until you open it
     url = existing_instance(home)
     if url:  # already running: just bring the window back
-        open_window(url, home / "data" / "window-profile")
+        if not background:
+            open_window(url, home / "data" / "window-profile")
         return 0
     from .agent import Overdrive
     od = Overdrive(home=home)
     od.auto_import_packs()
-    asyncio.run(serve(od, open_ui=not os.environ.get("OVERDRIVE_NO_WINDOW")))
+    asyncio.run(serve(od, open_ui=not os.environ.get("OVERDRIVE_NO_WINDOW") and not background))
     return 0
 
 
