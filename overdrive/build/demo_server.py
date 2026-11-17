@@ -240,6 +240,9 @@ async def main() -> None:
     idle_file = root / "idle.txt"
     idle_file.write_text("0")
     print(f"IDLE {idle_file}", flush=True)
+    # a made-up claude.ai export for the import test
+    from overdrive.selftests.piece3_tests import _export_zip
+    print(f"EXPORT {_export_zip(root / 'claude-export.zip')}", flush=True)
 
     def idle() -> float:
         try:

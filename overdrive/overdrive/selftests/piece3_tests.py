@@ -855,3 +855,159 @@ def test_picture_cleanup():
         r2 = ps.cleanup(0, 0) if False else ps.cleanup(0, 50)
         assert r2["removed"] == 0
         assert ps.cleanup(0, 1000)["left"] == 4 and size > 0
+
+
+# ================================================================ Part 5c: old chats, feelings, changing itself
+def _export_zip(path: Path, email: str = "me@example.com") -> Path:
+    import json as _json
+    convs = [
+        {"uuid": "aaaa-1111", "name": "Racing game ideas", "created_at": "2025-03-02T10:00:00.000000Z",
+         "updated_at": "2025-03-02T11:00:00.000000Z",
+         "chat_messages": [{"sender": "human", "text": "lets make a racing game", "created_at": "2025-03-02T10:00:00Z"},
+                           {"sender": "assistant", "text": "", "content": [{"type": "text", "text": "Sure! Realistic or arcade?"}],
+                            "created_at": "2025-03-02T10:00:05Z"}]},
+        {"uuid": "bbbb-2222", "name": "", "created_at": "2024-01-05T08:30:00.000000Z", "updated_at": "2024-01-05T08:31:00Z",
+         "chat_messages": [{"sender": "human", "text": "hi claude this is my very first message to you ever", "created_at": "2024-01-05T08:30:00Z"},
+                           {"sender": "assistant", "text": "Hi! Nice to meet you.", "created_at": "2024-01-05T08:30:03Z"}]},
+        {"uuid": "cccc-3333", "name": "Empty one", "created_at": "2025-06-01T00:00:00Z", "chat_messages": []},
+        "junk",
+    ]
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("data-2026/conversations.json", _json.dumps(convs))
+        z.writestr("data-2026/users.json", _json.dumps([{"email_address": email}]))
+    return path
+
+
+@covers(43, 57, title="Old claude.ai chats: real dates, one folder per account, First chat ever, no copies")
+def test_chat_archive_import():
+    from ..chatimport import ChatArchive, ImportFailed
+    with TempDir() as tmp:
+        ar = ChatArchive(tmp)
+        r = ar.import_export(_export_zip(tmp / "a.zip"))
+        assert r["account"] == "me@example.com" and r["added"] == 3 and r["skipped"] == 1, r
+        f = ar.folders()
+        assert len(f) == 1 and [c["name"] for c in f[0]["chats"]] == ["Empty one", "Racing game ideas",
+                                                                       "hi claude this is my very first message to you..."], f
+        first = [c for c in f[0]["chats"] if c["first_ever"]]
+        assert len(first) == 1 and first[0]["created"].startswith("2024-01-05"), first
+        d = ar.get(first[0]["key"])
+        assert d["meta"]["first_ever"] and d["messages"][0]["who"] == "you" and d["messages"][1]["text"] == "Hi! Nice to meet you."
+        racing = ar.get("me@example.com::aaaa-1111")
+        assert racing["messages"][1]["text"] == "Sure! Realistic or arcade?"          # text from content blocks
+        again = ar.import_export(tmp / "a.zip")
+        assert again["added"] == 0 and again["updated"] == 0, again
+        r2 = ar.import_export(_export_zip(tmp / "b.zip", "second@example.com"), account="Second account")
+        assert r2["account"] == "Second account" and len(ar.folders()) == 2
+        assert ar.first_ever() == first[0]["key"]                                       # still the oldest of ALL
+        hits = ar.search("arcade")
+        assert hits and hits[0]["name"] == "Racing game ideas" and "arcade" in hits[0]["snippet"].lower()
+        assert "Realistic or arcade" in ar.continue_text("me@example.com::aaaa-1111")
+        bad = tmp / "bad.zip"
+        with zipfile.ZipFile(bad, "w") as z:
+            z.writestr("x.txt", "nope")
+        try:
+            ar.import_export(bad)
+            raise AssertionError("a zip without chats should fail")
+        except ImportFailed:
+            pass
+        assert ar.remove_account("Second account") == 3 and len(ChatArchive(tmp).folders()) == 1
+
+
+@covers(9, title="Feelings move with what happens, drift back, and its approved upgrades shape it")
+def test_feelings_and_upgrades():
+    from ..feelings import MOODS, Feelings
+    with TempDir() as tmp:
+        f = Feelings(tmp)
+        assert f.current()["word"] == "calm"
+        f.on_task("done", "build the racer")
+        f.on_task("done", "fix the menu")
+        assert f.current()["word"] == "proud", f.current()
+        f.on_message("yo this is fire, thanks bro")
+        assert f.moods["excited"] > MOODS["excited"]
+        f.on_task("failed", "export the game", failed_reason="the exporter crashed")
+        assert any("exporter" in w["text"] for w in f.wants)
+        f.at -= 30 * 3600                                     # a day later: back to calm
+        assert f.current()["word"] == "calm"
+        u = f.add_upgrade("voice", "Talk a bit faster", "Use shorter sentences when excited.", "they like fast",
+                          settings={"voice_rate": 1.2, "evil": "x"})
+        assert u["settings"] == {"voice_rate": 1.2}
+        assert "Talk a bit faster" in f.prompt_block() and "YOUR MOOD RIGHT NOW" in f.prompt_block()
+        f.set_upgrade(u["id"], on=False)
+        assert "YOUR OWN UPGRADES" not in f.prompt_block()
+        assert Feelings(tmp).upgrades[0]["on"] is False                                  # saved
+
+
+@covers(92, 44, title="Changing itself: a copy, its own tests, install with a backup, automatic go-back")
+def test_self_update():
+    from ..selfmod import MAX_TRIES, SelfMod
+    with TempDir() as tmp:
+        app = tmp / "app" / "overdrive"
+        app.mkdir(parents=True)
+        (app / "__init__.py").write_text("VERSION = '1'\n")
+        (app / "settings.py").write_text("A = 1\n")
+        (app / "old.py").write_text("x = 1\n")
+        results = {"ok": True, "summary": "passed 5, failed 0, skipped 0"}
+        sm = SelfMod(tmp / "home", tmp / "ws", tmp / "data", app_pkg=app, runner=lambda root: dict(results))
+        (tmp / "data").mkdir()
+        dev = sm.prepare("add a setting B")
+        (dev / "settings.py").write_text("A = 1\nB = 2\n")
+        (dev / "new.py").write_text("y = 2\n")
+        (dev / "old.py").unlink()
+        try:
+            sm.install()
+            raise AssertionError("install before check must fail")
+        except ValueError:
+            pass
+        chk = sm.check()
+        assert chk["ok"] and chk["diff"] == {"changed": ["settings.py"], "added": ["new.py"], "removed": ["old.py"]}, chk
+        (dev / "new.py").write_text("y = 3\n")                                   # changed after the check
+        try:
+            sm.install()
+            raise AssertionError("a copy changed after its check must not install")
+        except ValueError:
+            pass
+        sm.check()
+        res = sm.install()
+        assert (app / "settings.py").read_text().endswith("B = 2\n") and (app / "new.py").is_file()
+        assert not (app / "old.py").exists() and Path(res["backup"], "old.py").is_file()
+        assert sm.versions() and sm.state()["step"] == "installed"
+        for _ in range(MAX_TRIES):
+            assert sm.on_start() == "trying"
+        assert sm.on_start() == "rolled_back"                                    # it never got going: put back
+        assert (app / "old.py").is_file() and not (app / "new.py").exists()
+        results.update(ok=False, summary="passed 4, failed 1")
+        sm.prepare("break it")
+        (sm.dev_pkg / "settings.py").write_text("oops(\n")
+        assert not sm.check()["ok"]
+        try:
+            sm.install()
+            raise AssertionError("failing tests must not install")
+        except ValueError:
+            pass
+        assert (app / "settings.py").read_text() == "A = 1\n"
+
+
+@covers(9, 33, cli=True, title="It proposes an upgrade to itself; only your Yes adds it, and it shows up in its instructions")
+def test_e2e_propose_upgrade():
+    seen = []
+
+    def go(tmp, fake):
+        od = make_agent(tmp, fake, mode="chat")
+
+        def script(req, f):
+            if not is_overdrive_main(req):
+                return [X("Upgrade Talk")]
+            seen.append(system_text(req))
+            if turn_index(req) == 0 and "upgrade yourself" in json_text(req):
+                return [T("propose_upgrade", kind="voice", title="Talk a bit faster", change="Shorter sentences.",
+                          why="they like fast", settings={"voice_rate": 1.25})]
+            return [X("Done.")]
+        fake.script = script
+        rec = run_task(od, "upgrade yourself to talk faster", answer=lambda c: ("yes", None, ""))
+        assert rec.status == "done", rec.status_reason
+        assert od.settings.get("voice_rate") == 1.25 and od.feelings.upgrades[0]["title"] == "Talk a bit faster"
+        run_task(od, "hi again")                                         # a new chat: new instructions
+        assert "Talk a bit faster" in seen[-1] and "YOUR MOOD RIGHT NOW" in seen[-1]
+        run_task(od, "upgrade yourself again", answer=lambda c: ("no", None, ""))
+        assert len(od.feelings.upgrades) == 1                            # No = nothing added
+    with_fake(lambda r, f: [X("ok")], go)

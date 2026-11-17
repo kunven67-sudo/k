@@ -276,7 +276,8 @@ def test_e2e_only_overdrive_tools():
     ours = {f"mcp__overdrive__{n}" for n in ("get_time", "calculator", "list_folder", "read_text_file",
                                              "write_text_file", "task_plan", "task_report", "memory_remember",
                                              "memory_recall", "memory_list", "memory_update", "memory_archive",
-                                             "start_build", "show_pictures", "schedule_job")}
+                                             "start_build", "show_pictures", "schedule_job", "propose_upgrade",
+                                             "self_update", "self_update_check", "self_update_install")}
 
     def names_for(mode):
         seen = {}

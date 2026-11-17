@@ -47,7 +47,7 @@ except Exception as _e:  # pragma: no cover
     SDK_VERSION = f"missing ({_e})"
 
 READ_RISKS = (Risk.INTERNAL, Risk.READ)
-ALWAYS_ASK = {"schedule_job"}
+ALWAYS_ASK = {"schedule_job", "propose_upgrade", "self_update_install"}
 TOOL_TIMEOUT_S = 60
 
 
@@ -153,6 +153,16 @@ class Overdrive:
         self.schedule = Schedule(self.paths.data)
         self.net = Net(self)
         self.started_at = time.time()
+        from .feelings import Feelings, make_upgrade_tool
+        self.feelings = Feelings(self.paths.data)
+        self.tools.add(make_upgrade_tool(self))
+        from .selfmod import SelfMod, make_selfmod_tools
+        self.selfmod = SelfMod(self.paths.home, self.paths.workspace, self.paths.data)
+        for spec in make_selfmod_tools(self):
+            self.tools.add(spec)
+        self.restart_requested = False
+        from .chatimport import ChatArchive
+        self.archive = ChatArchive(self.paths.data)
         from .btw import SideBox
         self.btw = SideBox(self)
         from .schedule import make_schedule_tool
@@ -256,6 +266,8 @@ class Overdrive:
             conv.auto_title = not background
         rec = TaskRecord(id=new_task_id(), conversation=conv.id, request=text, background=background)
         rec.attachments = pics
+        if not background:
+            self.feelings.on_message(text)
         rec.mode = conv.mode if conv.mode in ("chat", "build") else "chat"
         rec.settings = {k: self.settings.get(k) for k in ("model", "fallback_model", "effort", "detail", "max_steps",
                                                           "max_minutes", "task_budget_usd", "double_check")}
@@ -1087,7 +1099,8 @@ class Overdrive:
             tools=list(builtin.BUILD_TOOLS if mode == "build" else builtin.CHAT_TOOLS), allowed_tools=[],
             mcp_servers={ToolRegistry.MCP_SERVER: self._sdk_server(st)},
             strict_mcp_config=True, setting_sources=[],
-            system_prompt=build_system_prompt(s, memory_digest=self.memory.digest(), mode=mode),
+            system_prompt=build_system_prompt(s, memory_digest=self.memory.digest() + "\n\n" + self.feelings.prompt_block(),
+                                              mode=mode),
             permission_mode="default", can_use_tool=self._make_gate(st), model=model,
             fallback_model=fallback, effort=st.conv.effort or s.get("effort"), max_turns=int(s.get("max_steps")),
             max_budget_usd=budget, cwd=str(self.paths.workspace), cli_path=cli, env=env,
@@ -1252,6 +1265,8 @@ class Overdrive:
                                        or st.conv.session_rules != rules):
                 # Claude Code keeps a chat's FIRST instructions: after a mode or talk-style switch, say the new ones.
                 query = mode_switch_note(rec.mode, self.settings) + rec.request
+            mood = self.feelings.current()["word"]
+            query = f"[OVERDRIVE mood right now: {mood}]\n" + query
             if rec.attachments:
                 await client.query(self._with_pictures(query, rec.attachments))
             else:
@@ -1334,6 +1349,14 @@ class Overdrive:
             fh = self.usage.rate_limits.get("five_hour") or {}
             self.events.publish("limit_hit", account=self.accounts.active, others=self.accounts.names(),
                                 resets_at=fh.get("resets_at"), text=st.limit or st.error_text)
+        if self.restart_requested:
+            self.events.publish("restart", why="installed its own change")
+        if not rec.background:
+            try:
+                self.feelings.on_task(rec.status, rec.request, rec.status_reason if rec.status in ("failed", "blocked") else "")
+                self.events.publish("feelings", feelings=self.feelings.public())
+            except Exception as e:
+                self.audit.write("feelings_error", {"error": repr(e)[:300]})
         if res is not None and st.conv.rewind_at:
             st.conv.rewind_at = ""
             self._save_conversations()

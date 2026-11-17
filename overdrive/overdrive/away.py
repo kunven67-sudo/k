@@ -281,6 +281,8 @@ class Away:
             self.session["learn_pct"] = round(self.session["learn_pct"] + used, 2)
             self.session["learn_runs"] += 1
         self.od.audit.write("away_learned", {"task": rec.id if rec else "", "used_pct": used, "learned": learned})
+        if getattr(self.od, "feelings", None) is not None:
+            self.od.feelings.on_learned(len(learned))
         self.od.events.publish("away", away=self.public())
 
     # ------------------------------------------------------------------ done projects

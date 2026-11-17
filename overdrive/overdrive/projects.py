@@ -12,7 +12,7 @@ from pathlib import Path
 from .jsonio import atomic_write_json, read_json, utc_now_iso
 
 GROUP_DIRS = {"games", "apps", "tools", "mods", "projects", "sites", "scripts", "experiments"}
-SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "_chat-pictures", ".godot", "Library",
+SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "_chat-pictures", "_overdrive-dev", ".godot", "Library",
              "Temp", "obj", ".vs", ".idea"}
 MARKERS = {"index.html", "main.py", "package.json", "project.godot", "Cargo.toml", "go.mod", "main.lua",
            "manifest.json", "CMakeLists.txt", "pyproject.toml", "game.py", "app.py"}

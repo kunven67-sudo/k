@@ -276,17 +276,20 @@ function renderChats() {
     box.appendChild(head);
     if (S.doneOpen) for (const c of done) { const r = chatRow(c); r.classList.add("is-done"); box.appendChild(r); }
   }
+  P3.renderImported(box);
 }
 function renderChatHits() {
   const box = $("#chats");
-  box.innerHTML = S.chatHits.length ? "" : `<div class="muted" style="padding:6px 10px;font-size:12.5px">Nothing found</div>`;
+  box.innerHTML = S.chatHits.length || (P3.imp.hits || []).length ? "" : `<div class="muted" style="padding:6px 10px;font-size:12.5px">Nothing found</div>`;
   for (const h of S.chatHits) box.appendChild(chatRow(h, h.snippet));
+  P3.renderImportedHits(box);
 }
 let chatQTimer = null;
 function searchChats() {
   clearTimeout(chatQTimer);
   const q = $("#chat-q").value.trim();
-  if (!q) { S.chatHits = null; renderChats(); return; }
+  if (!q) { S.chatHits = null; P3.imp.hits = []; renderChats(); return; }
+  P3.searchImported(q);
   const low = q.toLowerCase();                             // names first, right away; then what was said, from the PC
   S.chatHits = ((S.state && S.state.conversations) || []).filter((c) => (c.title || "").toLowerCase().includes(low)).map((c) => ({ id: c.id, title: c.title }));
   renderChatHits();
@@ -339,6 +342,7 @@ async function deleteChat(id) {
 }
 
 async function openConversation(id, quiet) {
+  P3.leaveImported();
   if (id !== S.conv) { P3.saveDraft(); P3.draftFor = undefined; }
   S.conv = id;
   renderMode();
@@ -360,6 +364,7 @@ async function openConversation(id, quiet) {
 
 function newChat() {
   if (S.state && S.state.current && !S.state.current.background) { toast("Wait until the running task is finished (or press STOP).", "warn"); return; }
+  P3.leaveImported();
   P3.saveDraft();
   S.conv = null;
   $("#msg").value = ""; P3.loadDraft();

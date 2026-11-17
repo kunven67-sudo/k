@@ -14,6 +14,8 @@ P3.state = function (st) {
   P3.paintNet(st.net);
   P3.btw.items = st.btw || [];
   P3.applyLooks(st.settings);
+  P3.paintMind(st.feelings);
+  if (!P3.imp.loaded) { P3.imp.loaded = true; P3.loadImported(); }
   P3.interrupted(st.interrupted);
   P3.loadDraft();
   P3.paintAccount(st.accounts);
@@ -41,6 +43,10 @@ P3.event = function (ev) {
     case "away": P3.paintAwayChip(ev.away); if (S.tab === "away") P3.loadAway(); break;
     case "away_report": P3.awayReport(ev.report); if (S.tab === "away") P3.loadAway(); break;
     case "btw": P3.btwItem(ev.item); break;
+    case "feelings": P3.paintMind(ev.feelings); break;
+    case "restart":
+      document.body.insertAdjacentHTML("beforeend", `<div class="restarting"><div class="face big excited"><i></i><i></i><b></b></div><h2>Restarting into its new version...</h2><p class="muted">A new window opens by itself in a few seconds. You can close this one.</p></div>`);
+      break;
     case "net": if (S.state) S.state.net = ev.net; P3.paintNet(ev.net); break;
     case "accounts": P3.paintAccount(ev.accounts); break;
     case "limit_hit": P3.limitHit(ev); break;
@@ -98,7 +104,7 @@ P3.settingsHtml2 = function (s, opt, sw, num) {
       <div class="hint row2"><span></span><span class="hint">Personal things (health, money, family, love life, feelings) and new rules ALWAYS ask first, whatever this says. The same thing is never saved twice.</span></div>
       <div class="btns"><button type="button" class="ghost" id="set-mem-open">Open the Memory page</button></div>
     </div>
-    <div class="st-sec"><h3>Help</h3><div class="btns"><button type="button" class="ghost" id="set-tour">Show the tour again</button><button type="button" class="ghost" id="set-accts">Claude accounts</button></div></div>`;
+    <div class="st-sec"><h3>Help</h3><div class="btns"><button type="button" class="ghost" id="set-tour">Show the tour again</button><button type="button" class="ghost" id="set-accts">Claude accounts</button><button type="button" class="ghost" id="set-impchats">Import my claude.ai chats</button><button type="button" class="ghost" id="set-versions">Its own versions</button></div></div>`;
 };
 
 P3.bind = function () {
@@ -110,6 +116,8 @@ P3.bind = function () {
     if (e.target.id === "set-mem-open") switchTab("memory");
     if (e.target.id === "set-tour") P3.startTour();
     if (e.target.id === "set-accts") P3.showAccounts();
+    if (e.target.id === "set-impchats") P3.showImportChats();
+    if (e.target.id === "set-versions") P3.showVersions();
     if (e.target.id === "voice-test") {
       const sel = $("[data-k=voice_name]"), rate = $("[data-k=voice_rate]"), pitch = $("[data-k=voice_pitch]");
       const keep = Object.assign({}, S.state.settings);
@@ -129,6 +137,8 @@ P3.bind = function () {
   $("#drawer-body").addEventListener("click", P3.accountsClick);
   $("#tour").addEventListener("click", P3.tourClick);
   P3.bind5b();
+  $("#mind-chip").addEventListener("click", P3.showMind);
+  $("#drawer-body").addEventListener("click", P3.mindClick);
   $("#btw-toggle").addEventListener("click", () => { if ($("#btw").classList.contains("hidden")) P3.openBtw(true); else { $("#btw").classList.add("hidden"); $("#btw-toggle").classList.remove("on"); } });
   $("#btw-x").addEventListener("click", () => { $("#btw").classList.add("hidden"); $("#btw-toggle").classList.remove("on"); });
   $("#btw-form").addEventListener("submit", (e) => { e.preventDefault(); P3.askBtw($("#btw-q").value); });
@@ -1173,4 +1183,159 @@ P3.bind5b = function () {
     $$(".sw").forEach((x) => x.classList.toggle("on", x === sw));
     P3.applyLooks(Object.assign({}, S.state.settings, { accent: sw.dataset.accent }));
   });
+};
+
+
+/* ================================================================ Part 5c: your old claude.ai chats */
+P3.imp = { folders: [], open: new Set(), hits: [], viewing: null };
+P3.loadImported = async function () {
+  try { P3.imp.folders = (await api("/api/imported")).folders; } catch (e) { P3.imp.folders = []; }
+  if (!S.chatHits) renderChats();
+};
+P3.dateShort = (iso) => { if (!iso) return ""; const d = new Date(iso); return d.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }); };
+P3.impRow = function (c, snippet) {
+  const row = document.createElement("div");
+  row.className = "chat-row imp-row" + (P3.imp.viewing === c.key ? " on" : "");
+  row.innerHTML = `<button class="chat-item" title="${esc(c.name)}">${c.first_ever ? `<span class="first-badge">First chat ever</span>` : ""}${esc(c.name)}
+    <span class="imp-date">${esc(P3.dateShort(c.created))} &middot; ${c.messages} msg${c.messages === 1 ? "" : "s"}</span>${snippet ? `<span class="snip">${esc(snippet)}</span>` : ""}</button>`;
+  $(".chat-item", row).addEventListener("click", () => { switchTab("chat"); P3.showImported(c.key); });
+  return row;
+};
+P3.renderImported = function (box) {
+  const f = P3.imp.folders || [];
+  if (!f.length) return;
+  const head = document.createElement("div");
+  head.className = "imp-head";
+  head.innerHTML = `<span>Imported from claude.ai</span><button class="ghost xs" data-impnew title="Import another export">+ Import</button>`;
+  head.querySelector("[data-impnew]").addEventListener("click", P3.showImportChats);
+  box.appendChild(head);
+  for (const folder of f) {
+    const open = P3.imp.open.has(folder.account);
+    const fh = document.createElement("button");
+    fh.className = "done-head imp-folder" + (open ? " open" : "");
+    fh.innerHTML = `<span class="tri"></span><span class="imp-acc">${esc(folder.account)}</span> <span class="muted">${folder.count}</span>`;
+    fh.addEventListener("click", () => { if (open) P3.imp.open.delete(folder.account); else P3.imp.open.add(folder.account); renderChats(); });
+    box.appendChild(fh);
+    if (open) for (const c of folder.chats) box.appendChild(P3.impRow(c));
+  }
+};
+P3.searchImported = async function (q) {
+  clearTimeout(P3._iq);
+  P3._iq = setTimeout(async () => {
+    try { const d = await api(`/api/imported?q=${encodeURIComponent(q)}`); if ($("#chat-q").value.trim() === q) { P3.imp.hits = d.hits; if (S.chatHits) renderChatHits(); } }
+    catch (e) { /* none */ }
+  }, 300);
+};
+P3.renderImportedHits = function (box) {
+  const hits = P3.imp.hits || [];
+  if (!hits.length) return;
+  const head = document.createElement("div");
+  head.className = "imp-head"; head.innerHTML = "<span>Imported chats</span>";
+  box.appendChild(head);
+  for (const h of hits) box.appendChild(P3.impRow(h, h.snippet));
+};
+P3.leaveImported = function () { if (P3.imp.viewing) { P3.imp.viewing = null; const v = $(".imp-view"); if (v) v.remove(); } };
+P3.showImported = async function (key) {
+  let d;
+  try { d = await api(`/api/imported?key=${encodeURIComponent(key)}`); } catch (e) { toast(e.message, "bad"); return; }
+  if (S.state && S.state.current && !S.state.current.background && S.conv === S.state.current.conversation) { /* leaving a working chat is fine: it keeps going */ }
+  P3.saveDraft(); P3.draftFor = null;
+  S.conv = null; S.tasks = new Map(); renderFeed();
+  P3.imp.viewing = key;
+  const m = d.meta;
+  $("#chat-title").textContent = m.name;
+  $("#empty").classList.add("hidden");
+  const view = document.createElement("div");
+  view.className = "imp-view";
+  view.innerHTML = `<div class="imp-top">${m.first_ever ? `<span class="first-badge big">First chat ever</span>` : ""}<b>${esc(m.name)}</b>
+      <span class="muted">from claude.ai &middot; ${esc(m.account)} &middot; made ${esc(new Date(m.created).toLocaleString([], { dateStyle: "long", timeStyle: "short" }))} &middot; ${m.messages} messages</span>
+      <button class="primary sm" data-impgo="${esc(key)}">Keep going in a new chat</button></div>
+    ${d.messages.map((x) => x.who === "you"
+      ? `<div class="me"><div>${esc(x.text)}${x.files.length ? `<span class="imp-files">${x.files.map(esc).join(", ")}</span>` : ""}</div></div>`
+      : `<div class="od imp-od"><div class="answer">${md(x.text)}</div><div class="muted imp-when">${esc(x.when ? new Date(x.when).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "")}</div></div>`).join("")}`;
+  $("#feed").appendChild(view);
+  $("#feed").scrollTop = 0;
+  $("[data-impgo]", view).addEventListener("click", async () => {
+    try { const r = await api("/api/imported", { action: "continue", key }); P3.leaveImported(); await refreshState(); await openConversation(r.conversation); }
+    catch (e) { toast(e.message, "bad"); }
+  });
+  renderChats();
+};
+P3.showImportChats = function () {
+  $("#drawer-body").innerHTML = `<h2 style="margin-top:0">Import your claude.ai chats</h2>
+    <ol class="muted imp-steps"><li>On claude.ai: <b>Settings</b> &gt; <b>Privacy</b> &gt; <b>Export data</b>. Claude emails you a download link (it can take a while).</li>
+    <li>Download the zip. In File Explorer hold <b>Shift</b>, right-click it, <b>Copy as path</b>.</li><li>Paste it here. Do this once per account.</li></ol>
+    <div class="imp-row"><input id="impc-path" placeholder="C:\\Users\\you\\Downloads\\data-2026-11-17.zip" spellcheck="false"></div>
+    <div class="imp-row"><input id="impc-acc" placeholder="Account name (blank = the email inside the export)" maxlength="80"><button class="primary" id="impc-go">Import</button></div>
+    <div class="muted" style="font-size:12.5px">Every chat keeps its real name and the date you made it, in one folder per account, newest on top. Your oldest chat of all gets a \u201cFirst chat ever\u201d badge. Importing the same export again adds nothing twice. Nothing leaves your PC.</div>
+    <div id="impc-out"></div>`;
+  $("#drawer").classList.remove("hidden");
+  $("#impc-go").addEventListener("click", async () => {
+    const path = $("#impc-path").value.trim();
+    if (!path) { toast("Paste the zip's path first.", "warn"); return; }
+    $("#impc-go").disabled = true; $("#impc-out").innerHTML = `<div class="loading">Reading your chats (a big export can take a minute)...</div>`;
+    try {
+      const r = await api("/api/imported", { action: "import", path, account: $("#impc-acc").value.trim() });
+      $("#impc-out").innerHTML = `<div class="box imp-done"><b>Done.</b> ${r.chats} chats in the export from <b>${esc(r.account)}</b>: ${r.added} new, ${r.updated} updated, ${r.skipped} already there.</div>`;
+      P3.imp.open.add(r.account);
+      P3.loadImported();
+    } catch (e) { $("#impc-out").innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+    $("#impc-go").disabled = false;
+  });
+};
+
+
+/* ================================================================ Part 5c: feelings, wants, its own upgrades */
+P3.feel = null;
+P3.MOODWORD = { happy: "happy", excited: "hyped", curious: "curious", proud: "proud", worried: "worried", frustrated: "frustrated", calm: "calm" };
+P3.paintMind = function (f) {
+  if (!f) return;
+  P3.feel = f;
+  $("#mind-word").textContent = f.word;
+  $("#mind-chip .face").className = "face " + f.mood;
+  if (!$("#drawer").classList.contains("hidden") && $("#mind-body")) P3.showMind();
+};
+P3.moodTone = function () {
+  const m = (P3.feel && P3.feel.mood) || "calm";
+  return { excited: { rate: 1.08, pitch: 1.06 }, happy: { rate: 1.03, pitch: 1.03 }, proud: { rate: 1.0, pitch: 1.02 },
+    curious: { rate: 1.02, pitch: 1.04 }, worried: { rate: 0.97, pitch: 0.98 }, frustrated: { rate: 0.94, pitch: 0.95 } }[m] || { rate: 1, pitch: 1 };
+};
+P3.showMind = function () {
+  const f = P3.feel;
+  if (!f) return;
+  $("#drawer-body").innerHTML = `<div id="mind-body"><h2 style="margin-top:0">How OVERDRIVE feels</h2>
+    <div class="mind-top"><span class="face big ${esc(f.mood)}"><i></i><i></i><b></b></span><div><div class="mind-word">${esc(f.word)}</div>
+      <div class="muted">${f.recent ? "Last thing that moved it: " + esc(f.recent) : "Nothing much happened yet."}</div></div></div>
+    <div class="mood-bars">${Object.entries(f.moods).map(([k, v]) => `<div class="mb"><span>${esc(P3.MOODWORD[k] || k)}</span><div class="ub"><i class="mood-${esc(k)}" data-w="${v}"></i></div><b>${v}</b></div>`).join("")}</div>
+    <p class="muted" style="font-size:12.5px">Its moods move with what happens (finishing things, failing, you being happy or mad, learning) and drift back to calm over a few hours. Its mood shows a little in how it talks and in its voice. Honest note: nobody can prove an AI truly feels.</p>
+    <h2>Things it wants to get better at</h2>
+    <div class="wants">${(f.wants || []).filter((w) => !w.done).map((w) => `<div class="want"><span>${esc(w.text)}</span><span class="muted">${esc(w.by)}</span><button class="ghost xs" data-dropwant="${esc(w.id)}">Remove</button></div>`).join("") || `<div class="muted">Nothing yet. It adds things when something goes wrong, or you can add some.</div>`}</div>
+    <div class="imp-row"><input id="want-new" maxlength="200" placeholder="Something it should get better at"><button class="ghost" id="want-add">Add</button></div>
+    <h2>Its own upgrades</h2>
+    <div class="ups">${(f.upgrades || []).slice().reverse().map((u) => `<div class="up${u.on ? "" : " off"}"><div><b>${esc(u.title)}</b> <span class="chip">${esc(u.kind)}</span><div class="muted">${esc(u.change)}</div></div>
+      <div class="btns"><button class="ghost xs" data-up="${esc(u.id)}" data-act="${u.on ? "upgrade_off" : "upgrade_on"}">${u.on ? "Turn off" : "Turn on"}</button><button class="ghost xs danger-t" data-up="${esc(u.id)}" data-act="upgrade_delete">Delete</button></div></div>`).join("") || `<div class="muted">None yet. When it finds a better way to work or talk, it asks you with a Yes/No card.</div>`}</div></div>`;
+  applyWidths($("#drawer-body"));
+  $("#drawer").classList.remove("hidden");
+};
+P3.mindClick = async function (e) {
+  const dw = e.target.closest("[data-dropwant]"), up = e.target.closest("[data-up]");
+  try {
+    if (dw) P3.paintMind(await api("/api/feelings", { action: "drop_want", id: dw.dataset.dropwant }));
+    else if (up) P3.paintMind(await api("/api/feelings", { action: up.dataset.act, id: up.dataset.up }));
+    else if (e.target.id === "want-add") { const t = $("#want-new").value.trim(); if (t) P3.paintMind(await api("/api/feelings", { action: "add_want", text: t })); }
+  } catch (err) { toast(err.message, "bad"); }
+};
+
+P3.showVersions = async function () {
+  let d;
+  try { d = await api("/api/selfmod"); } catch (e) { toast(e.message, "bad"); return; }
+  $("#drawer-body").innerHTML = `<h2 style="margin-top:0">Its own versions</h2>
+    <p class="muted">Every time it changes itself (after your Yes), the version before is kept here. Going back restarts OVERDRIVE. Your chats, memory and settings stay.</p>
+    ${d.versions.length ? d.versions.map((v) => `<div class="want"><span>${esc(v.name.replace(/^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2}).*/, "$1-$2-$3 $4:$5"))}</span><button class="ghost xs" data-goback="${esc(v.name)}">Go back to this one</button></div>`).join("")
+      : `<div class="muted">No older versions yet.</div>`}`;
+  $("#drawer").classList.remove("hidden");
+  $$("[data-goback]").forEach((b) => b.addEventListener("click", async () => {
+    if (!confirm("Go back to that version? OVERDRIVE restarts.")) return;
+    try { await api("/api/selfmod", { name: b.dataset.goback }); } catch (e) { toast(e.message, "bad"); }
+  }));
 };

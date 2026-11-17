@@ -119,6 +119,7 @@ class Server:
             "tour_done": bool(od.settings.get("tour_done")),
             "btw": od.btw.public(),
             "interrupted": list(od.interrupted),
+            "feelings": od.feelings.public(),
             "memory_counts": od.memory.counts(),
         }
 
@@ -141,7 +142,7 @@ class Server:
             ("/api/queue", self.queue_action, ["POST"]),
             ("/api/accounts", self.accounts_page, ["GET"]), ("/api/accounts/action", self.accounts_action, ["POST"]),
             ("/api/schedule", self.schedule_page, ["GET"]), ("/api/schedule/action", self.schedule_action, ["POST"]),
-            ("/api/chat/done", self.chat_done, ["POST"]), ("/api/upload", self.upload, ["POST"]),
+            ("/api/chat/done", self.chat_done, ["POST"]), ("/api/selfmod", self.selfmod_page, ["GET", "POST"]), ("/api/feelings", self.feelings_action, ["POST"]), ("/api/imported", self.imported, ["GET", "POST"]), ("/api/upload", self.upload, ["POST"]),
             ("/api/edit", self.edit, ["POST"]), ("/api/interrupted", self.interrupted, ["POST"]), ("/api/btw", self.btw_ask, ["POST"]),
             ("/api/away", self.away_page, ["GET"]), ("/api/away/action", self.away_action, ["POST"]),
             ("/api/memory", self.memory_page, ["GET"]), ("/api/memory/edit", self.memory_edit, ["POST"]),
@@ -340,6 +341,89 @@ class Server:
         od.audit.write("schedule_" + act, {"id": b.get("id"), "job": job, "by": "you"})
         od.events.publish("schedule", jobs=od.schedule.jobs)
         return JSONResponse(res)
+
+    async def imported(self, request: Request) -> Response:
+        """Your old claude.ai chats: list (GET), one chat (GET ?key=), import / keep going / remove (POST)."""
+        od = self.od
+        if request.method == "GET":
+            key = request.query_params.get("key")
+            if key:
+                d = od.archive.get(key)
+                return JSONResponse(d) if d else JSONResponse({"error": "not found"}, 404)
+            q = request.query_params.get("q", "").strip()
+            if q:
+                return JSONResponse({"hits": await asyncio.to_thread(od.archive.search, q[:200])})
+            return JSONResponse({"folders": od.archive.folders()})
+        b = await self._json(request)
+        act = str(b.get("action") or "")
+        try:
+            if act == "import":
+                from .chatimport import ImportFailed
+                path = str(b.get("path") or "").strip().strip('"')
+                if not path:
+                    return JSONResponse({"error": "Paste the export zip's path first."}, 400)
+                try:
+                    res = await asyncio.to_thread(od.archive.import_export, Path(path).expanduser(), str(b.get("account") or ""))
+                except (ImportFailed, OSError, ValueError) as e:
+                    return JSONResponse({"error": str(e)}, 400)
+                od.audit.write("chats_imported", {k: res[k] for k in ("account", "chats", "added", "updated")})
+                return JSONResponse(res)
+            if act == "continue":
+                text = od.archive.continue_text(str(b.get("key") or ""))
+                meta = od.archive.index[str(b.get("key"))]
+                conv = od.new_conversation(meta["name"][:60])
+                rec = await od.send(text, conv.id)
+                return JSONResponse({"task": rec.public(), "conversation": conv.id})
+            if act == "remove":
+                return JSONResponse({"removed": od.archive.remove_account(str(b.get("account") or ""))})
+        except (ValueError, KeyError, Busy) as e:
+            return JSONResponse({"error": str(e)}, 400)
+        return JSONResponse({"error": "unknown action"}, 400)
+
+    async def selfmod_page(self, request: Request) -> Response:
+        sm = self.od.selfmod
+        if request.method == "GET":
+            return JSONResponse({"versions": sm.versions(), "state": sm.state()})
+        b = await self._json(request)
+        name = str(b.get("name") or "")
+        v = next((x for x in sm.versions() if x["name"] == name), None)
+        if v is None:
+            return JSONResponse({"error": "no such version"}, 400)
+        if self.od.current is not None and not self.od.current.rec.background:
+            return JSONResponse({"error": "Wait until the running task is finished."}, 409)
+        try:
+            await asyncio.to_thread(sm.restore, Path(v["path"]), "you went back to it")
+        except (ValueError, OSError) as e:
+            return JSONResponse({"error": str(e)}, 400)
+        self.od.audit.write("self_update_restored", {"version": name, "by": "you"})
+        self.od.events.publish("restart", why="went back to an older version")
+        asyncio.create_task(self._restart_soon())
+        return JSONResponse({"ok": True})
+
+    async def _restart_soon(self) -> None:
+        await asyncio.sleep(1.5)
+        from .selfmod import restart_now
+        self.od.audit.write("app_restart", {"why": "its own update"})
+        restart_now(Path(__file__).resolve().parent.parent)
+        self.should_exit.set()
+
+    async def feelings_action(self, request: Request) -> Response:
+        b = await self._json(request)
+        f, act = self.od.feelings, str(b.get("action") or "")
+        try:
+            if act == "add_want":
+                f.add_want(str(b.get("text") or ""), by="you")
+            elif act == "drop_want":
+                f.drop_want(str(b.get("id") or ""))
+            elif act in ("upgrade_on", "upgrade_off", "upgrade_delete"):
+                f.set_upgrade(str(b.get("id") or ""), on=act == "upgrade_on", delete=act == "upgrade_delete")
+            else:
+                return JSONResponse({"error": "unknown action"}, 400)
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, 400)
+        self.od.audit.write("feelings_" + act, {"by": "you", **{k: b.get(k) for k in ("id", "text")}})
+        self.od.events.publish("feelings", feelings=f.public())
+        return JSONResponse(f.public())
 
     async def upload(self, request: Request) -> Response:
         """A picture you drop, paste or attach in the chat. Saved in OVERDRIVE's picture folder (checked: real
@@ -812,6 +896,21 @@ async def serve(od: Overdrive, open_ui: bool = True) -> None:
             except Exception as e:
                 od.audit.write("auto_resume_failed", {"error": repr(e)[:300]})
     resume_task = asyncio.create_task(auto_resume())
+
+    async def watch_restart() -> None:
+        # after "Yes, install it": restart into the new version once the answer is finished
+        while True:
+            await asyncio.sleep(1)
+            if od.restart_requested and od.current is None and not os.environ.get("OVERDRIVE_NO_RESTART"):
+                od.restart_requested = False
+                await server._restart_soon()
+                return
+
+    async def confirm_start() -> None:
+        await asyncio.sleep(15)
+        od.selfmod.started_ok()        # the new version is up: no going back by itself anymore
+    restart_task = asyncio.create_task(watch_restart())
+    confirm_task = asyncio.create_task(confirm_start())
     od.pictures.cleanup(int(od.settings.get("pictures_keep_days")), int(od.settings.get("pictures_max_mb")))
     try:
         await server.should_exit.wait()
@@ -821,6 +920,8 @@ async def serve(od: Overdrive, open_ui: bool = True) -> None:
         net_task.cancel()
         sched_task.cancel()
         resume_task.cancel()
+        restart_task.cancel()
+        confirm_task.cancel()
         if od.busy():
             await od.stop()
         userver.should_exit = True

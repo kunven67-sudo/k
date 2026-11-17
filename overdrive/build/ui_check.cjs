@@ -22,6 +22,8 @@ function start(port, ...extra) {
       if (nm) p.notes = nm[1].trim();
       const im = buf.match(/IDLE (.+)/);
       if (im) p.idle = im[1].trim();
+      const ex = buf.match(/EXPORT (.+)/);
+      if (ex) p.export = ex[1].trim();
       const nn = buf.match(/NET (.+)/);
       if (nn) p.net = nn[1].trim();
       if (m && !p.ready) {
@@ -504,6 +506,33 @@ function start(port, ...extra) {
     await page.selectOption("[data-k=font]", "default");
     await page.click("#save-settings");
     await page.waitForFunction(() => document.documentElement.dataset.theme === "dark", null, { timeout: 5000 });
+
+    // ---- Piece 3, part 5c: old claude.ai chats, feelings, its own versions
+    await page.click("#set-impchats");
+    await page.fill("#impc-path", srv.export);
+    await page.click("#impc-go");
+    await page.waitForSelector(".imp-done >> text=3 new", { timeout: 10000 });
+    await page.click("#drawer-x");
+    await page.click("#nav [data-tab=chat]");
+    await page.waitForSelector(".imp-row .first-badge", { timeout: 5000 });
+    await page.click(".imp-row:has(.first-badge) .chat-item");
+    await page.waitForSelector(".imp-view >> text=Nice to meet you", { timeout: 5000 });
+    assert((await page.innerText(".imp-top")).includes("2024"), "the real date, not today");
+    await shot(page, "25-first-chat-ever.png");
+    await page.fill("#chat-q", "arcade");
+    await page.waitForSelector("#chats .imp-row >> text=Racing game ideas", { timeout: 5000 });
+    await page.fill("#chat-q", "");
+    await page.click("#mind-chip");
+    await page.waitForSelector("#mind-body .mood-bars", { timeout: 5000 });
+    await page.fill("#want-new", "Make menus that fit each game");
+    await page.click("#want-add");
+    await page.waitForSelector(".want >> text=Make menus that fit each game", { timeout: 5000 });
+    await shot(page, "26-mind.png");
+    await page.click("#drawer-x");
+    await page.click("#nav [data-tab=settings]");
+    await page.click("#set-versions");
+    await page.waitForSelector("#drawer-body >> text=Its own versions", { timeout: 5000 });
+    await page.click("#drawer-x");
   } catch (e) {
     errors.push(String(e && e.stack || e));
   } finally {

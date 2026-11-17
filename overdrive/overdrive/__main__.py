@@ -31,13 +31,22 @@ def _run_app() -> int:
     from .server import existing_instance, open_window, serve
     home = default_home()
     background = "--background" in sys.argv[1:]      # started with Windows: no window until you open it
+    if "--restarted" in sys.argv[1:]:
+        import time
+        time.sleep(2.5)                               # let the old version close its window address first
     url = existing_instance(home)
     if url:  # already running: just bring the window back
         if not background:
             open_window(url, home / "data" / "window-profile")
         return 0
     from .agent import Overdrive
+    from .selfmod import SelfMod
+    from .paths import Paths
+    pth = Paths(home).ensure()
+    sm_state = SelfMod(pth.home, pth.workspace, pth.data).on_start()
     od = Overdrive(home=home)
+    if sm_state == "rolled_back":
+        od.startup_notes.append("My new version didn't start, so I went back to the one before. Nothing was lost.")
     od.auto_import_packs()
     od.recover_interrupted()
     asyncio.run(serve(od, open_ui=not os.environ.get("OVERDRIVE_NO_WINDOW") and not background))
@@ -77,6 +86,19 @@ def main(argv: list[str] | None = None) -> int:
         return 130
     except Exception:
         text = traceback.format_exc()
+        # a new version of itself that crashes on start: put the backup back and start that instead
+        try:
+            from .paths import Paths, default_home
+            from .selfmod import SelfMod, restart_now
+            pth = Paths(default_home())
+            sm = SelfMod(pth.home, pth.workspace, pth.data)
+            st = sm.state()
+            if st.get("step") == "installed" and st.get("backup"):
+                sm.restore(Path(st["backup"]), "the new version crashed on start")
+                restart_now(Path(__file__).resolve().parent.parent)
+                return 1
+        except Exception:
+            pass
         try:
             from .paths import default_home
             logs = default_home() / "logs"
