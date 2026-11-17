@@ -50,7 +50,7 @@ P3.event = function (ev) {
       break;
     case "net": if (S.state) S.state.net = ev.net; P3.paintNet(ev.net); break;
     case "accounts": P3.paintAccount(ev.accounts); break;
-    case "limit_hit": P3.limitHit(ev); break;
+    case "limit_hit": P3.limitHit(ev); P4.limitScreen(ev); break;
     case "schedule": if (S.tab === "schedule" && !P3.sched.editing) P3.loadSchedule(); else $("#nav-jobs").textContent = (ev.jobs || []).filter((j) => j.enabled).length || ""; break;
     case "chats_done_ask":
       P3.banner("chatsdone", `<span class="bn-ic"></span><div>${ev.chats.length} old chat${ev.chats.length === 1 ? "" : "s"} nobody used for a while: <b>${ev.chats.slice(0, 3).map((c) => esc(c.title)).join(", ")}${ev.chats.length > 3 ? "..." : ""}</b>. Move ${ev.chats.length === 1 ? "it" : "them"} to the Done folder?</div>

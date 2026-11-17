@@ -673,7 +673,7 @@ async function send(text, source) {
     $("#chat-title").textContent = (S.state.conversations.find((c) => c.id === S.conv) || {}).title || d.task.request.slice(0, 60);
     upsertTask(d.task);
   } catch (e) {
-    toast(e.message, "bad");
+    if (!P4.limitFromError(e.message)) toast(e.message, "bad");
     if (typed && !$("#msg").value) { $("#msg").value = text; autoGrow(); }   // nothing lost
     if (att.length) { P3.att = att.concat(P3.att); P3.paintAtt(); }
   } finally { if (typed) setTimeout(() => { if (S.sending === text) S.sending = null; }, 400); }

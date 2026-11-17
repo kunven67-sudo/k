@@ -143,6 +143,7 @@ P4.state = function (st) {
 P4.event = function (ev) {
   switch (ev.type) {
     case "voice": P4.voiceEvent(ev); break;
+    case "limit_hit": P4.limitScreen(ev); break;
     default: break;
   }
 };
@@ -258,3 +259,78 @@ P4.bindSettings = function () {
   });
 };
 P4.afterSettings = function () { P4.bindSettings(); P4.paintThumbs(); P4.loadOwnBgs(); };
+
+/* ================================================================ out of usage: the fuel gauge screen */
+P4.limitScreen = function (ev) {
+  const old = $("#limit-screen");
+  if (old) old.remove();
+  clearInterval(P4._lsT);
+  const paused = ev.kind === "paused";
+  const others = (ev.others || []).filter((n) => n !== ev.account);
+  const acct = (S.state && S.state.accounts && S.state.accounts.accounts || []).find((a) => a.name === ev.account) || {};
+  const pct = paused ? Math.round(ev.pct || 90) : 100;
+  const el = document.createElement("div");
+  el.id = "limit-screen";
+  el.className = "limit-screen" + (paused ? " paused" : "");
+  const ticks = Array.from({ length: 11 }, (_, i) => `<i style="--a:${-95 + i * 19}deg"></i>`).join("");
+  el.innerHTML = `<div class="ls-card">
+    <div class="ls-gauge"><div class="ls-ticks">${ticks}</div>
+      <span class="ls-f">F</span><span class="ls-e">E</span>
+      <div class="ls-needle" style="--to:${paused ? -95 + (100 - pct) * 1.9 : -95}deg"></div><div class="ls-hub"></div>
+      <div class="ls-glow"></div></div>
+    <h2>${paused ? `Paused at ${pct}% of your Claude usage` : "Out of Claude usage for now"}</h2>
+    <p class="muted">${esc(ev.text || "")}${acct.plan ? ` <span class="plan-badge p-${esc(acct.plan.split(" ")[0].toLowerCase())}">${esc(acct.plan)}</span>` : ""}</p>
+    <div class="ls-count"><span class="muted">${ev.resets_at ? "Back in" : "Comes back by itself"}</span><b id="ls-left">${ev.resets_at ? "" : "soon"}</b>
+      ${ev.resets_at ? `<span class="muted" id="ls-at"></span>` : ""}</div>
+    <div class="ls-btns">${others.map((n) => `<button class="primary" data-ls-use="${esc(n)}">Use ${esc(n)}</button>`).join("")}
+      <button class="ghost" data-ls="schedule">Schedule it for when it's back</button>
+      ${paused ? `<button class="ghost" data-ls="raise">Change the pause %</button>` : ""}
+      <button class="ghost" data-ls="music">Play chill music while I wait</button>
+      ${others.length ? "" : `<button class="ghost" data-ls="accounts">Add another account</button>`}
+      <button class="ghost" data-ls="close">Close</button></div>
+    <div class="muted ls-note">It never switches accounts by itself (that can get accounts banned). Everything you made is saved.</div>
+  </div>`;
+  ($("#tab-chat") || document.body).appendChild(el);
+  P4.sound("limit");
+  const tick = () => {
+    const left = ev.resets_at ? Math.max(0, ev.resets_at * 1000 - Date.now()) : 0;
+    const b = $("#ls-left");
+    if (!b) { clearInterval(P4._lsT); return; }
+    if (!ev.resets_at) return;
+    const h = Math.floor(left / 3600000), m = Math.floor((left % 3600000) / 60000), s = Math.floor((left % 60000) / 1000);
+    b.textContent = left <= 0 ? "now" : h ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m ${String(s).padStart(2, "0")}s`;
+    const at = $("#ls-at");
+    if (at) at.textContent = "at " + new Date(ev.resets_at * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    if (left <= 0) { clearInterval(P4._lsT); el.classList.add("refilled"); P4.sound("success"); }
+  };
+  tick();
+  P4._lsT = setInterval(tick, 1000);
+  el.addEventListener("click", async (e) => {
+    const u = e.target.closest("[data-ls-use]"), b = e.target.closest("[data-ls]");
+    if (u) {
+      try { await api("/api/accounts/action", { action: "switch", name: u.dataset.lsUse }); toast(`Now using the ${u.dataset.lsUse} account. Send your message again.`, "ok", 6000);
+        P3.banners.delete("limit"); P3.paintBanners(); checkSetup(true, true); P4.closeLimit(); }
+      catch (err) { toast(err.message, "bad"); }
+      return;
+    }
+    if (!b) return;
+    const what = b.dataset.ls;
+    if (what === "close") P4.closeLimit();
+    else if (what === "schedule") { P4.closeLimit(); switchTab("schedule"); }
+    else if (what === "raise") { P4.closeLimit(); switchTab("settings"); S.setQ = "usage"; renderSettings(); }
+    else if (what === "accounts") { P4.closeLimit(); P3.showAccounts(); }
+    else if (what === "music") { if (window.MUSIC) MUSIC.play(); else toast("Music comes with the music player.", "", 4000); }
+  });
+};
+P4.closeLimit = function () { const el = $("#limit-screen"); if (el) { el.classList.add("out"); setTimeout(() => el.remove(), 300); } clearInterval(P4._lsT); };
+P4.limitFromError = function (msg) {
+  const m = String(msg || "");
+  const paused = m.match(/usage is at (\d+)%/);
+  if (!paused && !/limit is used up/i.test(m)) return false;
+  const lim = (S.state && S.state.usage && S.state.usage.limits) || [];
+  const fh = lim.find((x) => x.type === "five_hour") || lim[0] || {};
+  P4.limitScreen({ kind: paused ? "paused" : "out", pct: paused ? Number(paused[1]) : 100, text: m,
+    account: S.state && S.state.accounts ? S.state.accounts.active : "main",
+    others: S.state && S.state.accounts ? S.state.accounts.accounts.map((a) => a.name) : [], resets_at: fh.resets_at || null });
+  return true;
+};

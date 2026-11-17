@@ -110,7 +110,7 @@ def main() -> int:
     # its own ears: the real engine DLLs + voice pack from the internet, then a real recording
     from overdrive.voice import Voice
     evs: list = []
-    with __import__("tempfile").TemporaryDirectory() as t:
+    with __import__("tempfile").TemporaryDirectory(ignore_cleanup_errors=True) as t:   # loaded DLLs can't be deleted
         v = Voice(Path(t), lambda typ, **k: evs.append(k))
         v.download("small")
         t0 = time.time()
