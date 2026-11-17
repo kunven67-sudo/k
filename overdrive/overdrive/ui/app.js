@@ -645,10 +645,15 @@ async function send(text, source) {
   if (!text) return;
   if (await copyCommand(text)) return;
   if (S.setup && !S.setup.ready) { $("#setup").classList.remove("hidden"); renderSetup(); return; }
+  // a fast double Enter / double click must send it once, not twice
+  const typed = source !== "voice";
+  if (typed && S.sending === text) return;
+  if (typed) { S.sending = text; if ($("#msg").value.trim() === text) { $("#msg").value = ""; autoGrow(); } }
   $("#send").disabled = true;
+  let att = [];
   try {
     // queue: if it's still working, the message waits and goes in right after (Piece 3)
-    const att = source === "voice" ? [] : P3.takeAttachments();
+    att = source === "voice" ? [] : P3.takeAttachments();
     const d = await api("/api/send", { text, conversation: S.conv, mode: S.conv ? undefined : (S.nextMode || "chat"), queue: true, source: source || "typed", attachments: att });
     S.nextMode = null;
     if (source !== "voice") { $("#msg").value = ""; autoGrow(); P3.clearDraft(); }
@@ -657,7 +662,11 @@ async function send(text, source) {
     P3.draftFor = S.conv;            // a new chat got its id: the box now belongs to it
     $("#chat-title").textContent = (S.state.conversations.find((c) => c.id === S.conv) || {}).title || d.task.request.slice(0, 60);
     upsertTask(d.task);
-  } catch (e) { toast(e.message, "bad"); }
+  } catch (e) {
+    toast(e.message, "bad");
+    if (typed && !$("#msg").value) { $("#msg").value = text; autoGrow(); }   // nothing lost
+    if (att.length) { P3.att = att.concat(P3.att); P3.paintAtt(); }
+  } finally { if (typed) setTimeout(() => { if (S.sending === text) S.sending = null; }, 400); }
   updateRunning();
 }
 
@@ -719,7 +728,7 @@ async function checkSetup(force, quiet) {
   try { S.setup = await api("/api/setup", force ? {} : undefined); } catch (e) { if (!quiet) toast(e.message, "bad"); return; }
   renderBrain();
   if (!S.setup.ready && !S.offlineOK && !quiet) { $("#setup").classList.remove("hidden"); }
-  if (S.setup.ready) $("#setup").classList.add("hidden");
+  if (S.setup.ready) { $("#setup").classList.add("hidden"); P3.maybeTour(); }
   renderSetup();
 }
 
@@ -1130,7 +1139,7 @@ function bindUI() {
   $("#brain-line").addEventListener("click", () => { if (S.setup && !S.setup.ready) { $("#setup").classList.remove("hidden"); renderSetup(); } });
   $("#setup-recheck").addEventListener("click", () => checkSetup(true));
   $("#setup-skip").addEventListener("click", () => { S.offlineOK = true; $("#setup").classList.add("hidden"); switchTab("tools"); });
-  $("#setup-go").addEventListener("click", () => $("#setup").classList.add("hidden"));
+  $("#setup-go").addEventListener("click", () => { $("#setup").classList.add("hidden"); P3.maybeTour(); });
   document.addEventListener("keydown", (e) => {
     const lb = !$("#lightbox").classList.contains("hidden");
     if (e.key === "Escape") { if (lb) closePicture(); else $("#drawer").classList.add("hidden"); }

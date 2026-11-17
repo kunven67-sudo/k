@@ -1,4 +1,12 @@
-# OVERDRIVE (Piece 2: ChatGPT mode)
+# OVERDRIVE (Piece 3: the rest)
+
+Piece 3 adds: one memory (import your notes, saves + tells you, Memory page), voice + talking while it works,
+the "by the way" box, while-you're-away (bug hunt + capped learning), schedule, accounts, internet light, Done
+folders, the real Edit, your pictures in the chat, power-cut proof, real CC0 assets, game eyes, the no-lag + rules
+check, usage guess, time machine, live view, feelings + its own upgrades, changing itself safely, your claude.ai
+chats, looks (black/white, font, size, color) and a tour. See LIMITATIONS.md for the honest list.
+
+## Piece 2 (ChatGPT mode)
 
 Piece 2 makes talking to it feel like ChatGPT: clear lists and tables, **real pictures** of what it's talking
 about (Openverse + Wikimedia Commons, free, with credits), no rushing to build, numbered **copy buttons** on

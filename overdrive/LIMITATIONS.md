@@ -1,11 +1,57 @@
-# Known limitations (Piece 2: ChatGPT mode)
+# Known limitations (Piece 3: the rest)
 
-Honest list. Built so far: the core engine, the safety system, long-term memory (old Stages 1 + 2),
-**Piece 1: the brain is basically Claude** (Claude Code's own tools, behind OVERDRIVE's gate) and
-**Piece 2: ChatGPT mode** (lists, tables, real pictures, no rushing, copy pieces, chat rename/delete/search).
-Coming next: Piece 3 (all the extra features: learn + bug hunt while idle, mic + voice, live view, tutorial,
-accounts, done-folder, internet light, memory "saves + tells you", import your memory, schedules), Piece 4
-(looks, animations, backgrounds).
+Honest list. Built so far: the core engine, the safety system, long-term memory, **Piece 1** (the brain is
+Claude Code's own tools, behind OVERDRIVE's gate), **Piece 2** (ChatGPT mode) and **Piece 3** (everything
+below). Coming next: Piece 4 (looks: moving backgrounds, anime-style backgrounds, animations).
+
+## Piece 3: what it can do now
+- **Memory**: one memory. Import your old notes once (folder or .zip, or a memory-pack.zip next to OVERDRIVE is
+  read on first start), sorted into Rules / Projects / About me / People / Experiences. Normal things save by
+  themselves and show "Saved to memory" with Undo; personal things and new rules always ask first. Memory page:
+  search, pin (pinned = always in its mind), edit (old text kept), archive, delete.
+- **Voice**: mic button (Ctrl+Space) types what you say; voice mode (Ctrl+Shift+Space) talks back out loud with
+  Edge's voices, in Chat and Build mode; Ctrl+M mutes; no wake word. Its voice follows its mood a little.
+- **Talk while it works**: messages you type or say while it's busy wait and go in right after the step.
+- **By the way box** (Ctrl+B): a quick side question answered right away on the side by a separate quick Claude
+  run; the main job never stops, slows or sees it.
+- **While you're away**: zero-usage bug hunt of your projects + learning capped at 5% or 10% of your 5-hour
+  limit a day (your pick). "While you were away" report when you're back. Your messages always go first.
+- **Projects**: Done switch (skipped by the bug hunt), Versions (time machine: every version kept, open an old
+  copy next to the new one, or go back).
+- **Schedule**: jobs at a day/time, every day/week, or "when my 5-hour usage resets"; it can suggest one (asks).
+- **Accounts**: several claude.ai accounts, one click to switch (never by itself); chats carry over.
+- **Internet light** + a "SIGNAL LOST" banner that stays until you close it.
+- **Chats**: smart short names, newest on top, Done folder, the real Edit (rewinds the chat; Claude forgets the
+  old branch), drop/paste/attach pictures (Claude really looks at them), Quick read line, "Do this one" buttons on
+  its ideas, drafts survive crashes, import your claude.ai chats (export zip: real dates, folder per account,
+  "First chat ever").
+- **Power-cut proof**: "I was in the middle of X" + Keep going (by itself after 25 s if you want).
+- **Builds**: real CC0 assets (textures, models, skies, sounds), game eyes + hands (Windows), no-lag rule for your
+  PC, Blender when installed, rules check before handing over, usage guess + "Schedule it for later", Live view.
+- **Feelings, wants, its own upgrades** (Mind panel), and **it changes itself** (copy, its own tests, your Yes,
+  restart, automatic go-back if the new version won't start).
+- **Looks**: black or white, font, text size, accent color. First-start tour.
+
+## Piece 3: limits (honest)
+- Voice uses Edge's speech typing and Edge's voices. The "Natural" voices and speech typing need the internet;
+  the offline voices sound more robotic. Edge asks for the microphone once.
+- Away detection, game eyes, the PC check and Start with Windows only work on Windows. Some games read keys in a
+  way window messages can't reach (raw input): then game eyes can look but not play. Web games: open them and use
+  the window title; keys may not reach the page. The "live view" is steps + screenshots, not a full video of a
+  hidden desktop yet.
+- The learning cap is measured with Claude Code's 5-hour meter when it reports it; when it doesn't, each learning
+  run counts as 2.5% (on the safe side). Learning reads web pages, it doesn't watch videos.
+- The bug hunt only looks (syntax, broken files, missing files, logs, crashes, giant pictures); it can't find
+  gameplay bugs by itself. Game eyes in Build mode can.
+- Accounts: each needs its own sign-in once. If a chat's saved history can't be copied to the other account, that
+  chat starts fresh (it tells you).
+- Imported claude.ai chats are history to read and search; Claude can't continue inside the old claude.ai chat
+  itself, so "Keep going" starts a new chat with the end of the old one.
+- Feelings are OVERDRIVE's own moods built from what happened. Nobody can prove an AI truly feels. Upgrades change
+  its instructions and settings, not the Claude model's brain.
+- Changing itself runs its offline self-tests on the copy; the ones that need Claude Code are skipped there.
+- The schedule, away mode and power-cut resume only run while OVERDRIVE is running (Keep running is on by
+  default; turn on Start with Windows on the While away page).
 
 ## Piece 2: what it can do now
 - **Talk like ChatGPT** (Settings, on by default): in Chat mode it answers with clear numbered lists, small
@@ -31,14 +77,12 @@ accounts, done-folder, internet light, memory "saves + tells you", import your m
   of other games. Openverse has a daily limit for apps without an account; when it's hit (or a library is
   down), OVERDRIVE uses the other one. Some licenses ask for credit if you publish the picture: the credit is shown with it.
 - Pictures are saved once in `OVERDRIVE\data\pictures` (so old chats still show them offline). Only real
-  JPEG/PNG/GIF/WebP files are kept; SVG and anything else is refused. There's no auto-clean of that folder yet.
-- Edit + resend sends a **new** message; it doesn't rewrite the old part of the chat like ChatGPT's branches
-  (Claude Code can't fork a chat's history from inside OVERDRIVE yet).
+  JPEG/PNG/GIF/WebP files are kept; SVG and anything else is refused. Clean-up: Settings > Chats > Chat pictures.
 - Deleting a chat removes its messages and task records for good. Files it made stay in the workspace, and
   the audit log keeps a record that the chat existed (the log can never be edited).
 - Talk-style switches reach an ongoing chat on your next message (OVERDRIVE adds a short note, because Claude
   Code keeps a chat's first instructions).
-- Not built yet: mic / voice, uploading your own pictures into the chat, picture editing, tutorial (Piece 3).
+- Not built yet: editing pictures (AI pictures need the graphics card plan).
 
 ## Piece 1: what it can do now
 - **Chat mode** (new chats start here): talk, explain, make lists, search the web, open web pages, read

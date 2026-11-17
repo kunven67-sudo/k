@@ -20,7 +20,7 @@ P3.state = function (st) {
   P3.loadDraft();
   P3.paintAccount(st.accounts);
   $("#nav-jobs").textContent = st.jobs ? String(st.jobs) : "";
-  if (!st.tour_done && !P3.toured) { P3.toured = true; setTimeout(() => { if ($("#setup").classList.contains("hidden")) P3.startTour(); }, 900); }
+  P3.maybeTour();
   const last = st.away && (st.away.reports || []).slice(-1)[0];
   if (last && !last.seen) P3.awayReport(last);
   const notes = st.notes || [];
@@ -108,6 +108,7 @@ P3.settingsHtml2 = function (s, opt, sw, num) {
 };
 
 P3.bind = function () {
+  try { const l = JSON.parse(localStorage.getItem("od_looks") || "null"); if (l) P3.applyLooks(l, true); } catch (e) { /* first start */ }
   $("#mem-q").addEventListener("input", () => { clearTimeout(P3._mq); P3._mq = setTimeout(() => { P3.mem.q = $("#mem-q").value.trim(); P3.loadMemory(); }, 220); });
   $("#mem-arch").addEventListener("change", () => { P3.mem.archived = $("#mem-arch").checked; P3.loadMemory(); });
   $("#mem-import-btn").addEventListener("click", P3.showImport);
@@ -1125,8 +1126,9 @@ P3.FONTS = { default: ["Default", "\"Segoe UI\", system-ui, sans-serif"], bahnsc
   verdana: ["Verdana (wide, easy to read)", "Verdana, \"Segoe UI\", sans-serif"], trebuchet: ["Trebuchet (round)", "\"Trebuchet MS\", \"Segoe UI\", sans-serif"],
   georgia: ["Georgia (classic)", "Georgia, \"Times New Roman\", serif"], cascadia: ["Cascadia (code look)", "\"Cascadia Code\", Consolas, monospace"] };
 P3.ACCENTS = [["#ff6a2b", "Orange"], ["#3b82f6", "Blue"], ["#a855f7", "Purple"], ["#22c55e", "Green"], ["#ef4444", "Red"], ["#ec4899", "Pink"], ["#eab308", "Gold"], ["#14b8a6", "Teal"]];
-P3.applyLooks = function (s) {
+P3.applyLooks = function (s, noSave) {
   if (!s) return;
+  if (!noSave) { try { localStorage.setItem("od_looks", JSON.stringify({ theme: s.theme, font: s.font, text_size: s.text_size, accent: s.accent })); } catch (e) { /* storage off */ } }
   const r = document.documentElement;
   r.dataset.theme = s.theme === "light" ? "light" : "dark";
   r.style.setProperty("--font", (P3.FONTS[s.font] || P3.FONTS.default)[1]);
@@ -1180,16 +1182,16 @@ P3.bind5b = function () {
     const k = e.target.dataset && e.target.dataset.k;
     if (!k || !["theme", "font", "text_size", "accent"].includes(k)) return;
     const preview = Object.assign({}, S.state.settings, { [k]: k === "text_size" ? Number(e.target.value) : e.target.value });
-    P3.applyLooks(preview);
+    P3.applyLooks(preview, true);
     const b = $(`[data-rv-pct="${k}"]`); if (b) b.textContent = e.target.value + "%";
   });
-  $("#settings-body").addEventListener("change", (e) => { const k = e.target.dataset && e.target.dataset.k; if (k === "theme" || k === "font") { const v = Object.assign({}, S.state.settings, { [k]: e.target.value }); P3.applyLooks(v); } });
+  $("#settings-body").addEventListener("change", (e) => { const k = e.target.dataset && e.target.dataset.k; if (k === "theme" || k === "font") { const v = Object.assign({}, S.state.settings, { [k]: e.target.value }); P3.applyLooks(v, true); } });
   $("#settings-body").addEventListener("click", (e) => {
     const sw = e.target.closest("[data-accent]");
     if (!sw) return;
     $("[data-k=accent]").value = sw.dataset.accent;
     $$(".sw").forEach((x) => x.classList.toggle("on", x === sw));
-    P3.applyLooks(Object.assign({}, S.state.settings, { accent: sw.dataset.accent }));
+    P3.applyLooks(Object.assign({}, S.state.settings, { accent: sw.dataset.accent }), true);
   });
 };
 
@@ -1412,4 +1414,13 @@ P3.showVersionsOf = async function (project) {
   $$("[data-tmopen]").forEach((b) => b.addEventListener("click", () => act("open_copy", b.dataset.tmopen)));
   $$("[data-tmback]").forEach((b) => b.addEventListener("click", () => { if (confirm("Go back to this version? The current one is saved first.")) act("go_back", b.dataset.tmback); }));
   $("[data-tmsave]").addEventListener("click", () => act("save", ""));
+};
+
+P3.maybeTour = function () {
+  // the first-start tour: once, and only when the setup screen isn't in the way
+  if (P3.toured || !S.state || S.state.settings.tour_done) return;
+  setTimeout(() => {
+    if (P3.toured || S.state.settings.tour_done || !$("#setup").classList.contains("hidden") || P3.tourAt >= 0) return;
+    P3.toured = true; P3.startTour();
+  }, 900);
 };
