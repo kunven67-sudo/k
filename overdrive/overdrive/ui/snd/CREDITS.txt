@@ -1,0 +1,7 @@
+OVERDRIVE's sounds: all CC0 (public domain), real recordings, trimmed + leveled for OVERDRIVE.
+- LaSonotheque / BigSoundBank (CC0) https://bigsoundbank.com
+  0026 Electric switch, 0540 Old switch, 0613 Pen click, 0808 Oven controllers, 0795 Large ratchet, 2191 relay
+  (click, toggle, knob, relay, boot, hover), 2063-2067 Notification "LaSoLisa" (done, pop, send, needs you, error),
+  1398/1399 Idea (idea, success), 1742 Apple Magic Mouse click (mouse), 1795/1797 Whoosh (whoosh),
+  1733 Slow keyboard (key1-4), 1395 Floppy disk input (save), 0479 Counter bell (bell), 2375 Intercom (ring),
+  1102 Bike bell (bike), 2254/2255 Digital watch beeps (mic on / off)

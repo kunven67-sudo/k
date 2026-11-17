@@ -38,6 +38,7 @@ function toast(text, kind = "", ms = 5200) {
   t.className = `toast ${kind}`;
   t.textContent = text;
   $("#toasts").appendChild(t);
+  if (typeof P4 !== "undefined") P4.sound(kind === "bad" ? "error" : "toast");
   setTimeout(() => t.remove(), ms);
 }
 
@@ -408,11 +409,13 @@ function upsertTask(t) {
     S.state.conversations.unshift({ id: t.conversation, title: t.request.slice(0, 60), created: t.created });
     renderChats();
   }
+  const before = S.tasks.get(t.id);
+  if (before && before.status === "running" && t.status !== "running") P4.taskFinished(t);
   if (t.conversation === S.conv) {
     S.tasks.set(t.id, t);
     const old = $(`#turn-${t.id}`);
     const node = turnNode(t);
-    if (old) old.replaceWith(node); else { $("#empty").classList.add("hidden"); $("#feed").appendChild(node); }
+    if (old) old.replaceWith(node); else { node.classList.add("fresh"); $("#empty").classList.add("hidden"); $("#feed").appendChild(node); }
     renderCards();
     autoScroll();
   }
@@ -464,7 +467,7 @@ function stepsList(t) {
 
 function turnNode(t) {
   const wrap = document.createElement("div");
-  wrap.className = "turn";
+  wrap.className = "turn" + (t.status === "running" ? " working" : "");
   wrap.id = `turn-${t.id}`;
   const running = t.status === "running";
   const head = running
@@ -639,14 +642,10 @@ function tickCards() {
 }
 
 function beep() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const o = ctx.createOscillator(), g = ctx.createGain();
-    o.frequency.value = 880; g.gain.value = 0.04;
-    o.connect(g); g.connect(ctx.destination); o.start();
-    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.18);
-    o.stop(ctx.currentTime + 0.2);
-  } catch (e) { /* no audio */ }
+  // a question card needs you: its own sound + the taskbar button blinks if the window is in the back
+  P4.sound("needs_you");
+  P4.flash();
+  P4.notifyNeedsYou();
 }
 
 /* ---------------------------------------------------------------- sending + stop */
@@ -668,6 +667,7 @@ async function send(text, source) {
     S.nextMode = null;
     if (source !== "voice") { $("#msg").value = ""; autoGrow(); P3.clearDraft(); }
     if (d.queued) { P3.queued(d.queued); $("#send").disabled = false; return; }
+    P4.sound("send");
     if (S.conv !== d.task.conversation) { S.conv = d.task.conversation; S.tasks = new Map(); renderFeed(); }
     P3.draftFor = S.conv;            // a new chat got its id: the box now belongs to it
     $("#chat-title").textContent = (S.state.conversations.find((c) => c.id === S.conv) || {}).title || d.task.request.slice(0, 60);
@@ -682,6 +682,7 @@ async function send(text, source) {
 
 function updateRunning() {
   const running = !!(S.state && S.state.current);
+  document.body.classList.toggle("od-working", running);
   $("#stop").classList.toggle("hidden", !running);
   $("#send").disabled = false;
   $("#msg").placeholder = running ? "It's working... you can still type: it goes in right after this step" : "Tell OVERDRIVE what to do...";
@@ -1040,6 +1041,7 @@ function renderSettings() {
         <button class="danger" id="quit">Quit OVERDRIVE</button></div></div>`;
   $("#set-q").addEventListener("input", (e) => { S.setQ = e.target.value; filterSettings(); });
   filterSettings();
+  P4.afterSettings();
   $("#set-check").addEventListener("click", () => checkSetup(true));
   $("#set-setup").addEventListener("click", () => { $("#setup").classList.remove("hidden"); renderSetup(); });
   $$("[data-open]").forEach((b) => b.addEventListener("click", async () => { try { await api("/api/open", { what: b.dataset.open }); } catch (e) { toast(e.message, "bad"); } }));
@@ -1101,6 +1103,8 @@ async function saveSettings() {
     renderSettings();
     if ("copy_numbers" in r.changed) { PIECES.clear(); renderFeed(); }
     P3.applyLooks(r.settings);
+    FX.apply(r.settings);
+    FX.play("save");
   } catch (e) { toast(e.message, "bad", 9000); }
 }
 

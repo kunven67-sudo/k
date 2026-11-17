@@ -61,7 +61,77 @@ var (
 	procCreateMutexW             = kernel32.NewProc("CreateMutexW")
 	procDwmSetWindowAttribute    = dwmapi.NewProc("DwmSetWindowAttribute")
 	procShellExecuteW            = shell32.NewProc("ShellExecuteW")
+	procShellNotifyIconW         = shell32.NewProc("Shell_NotifyIconW")
 )
+
+// ------------------------------------------------------------------ tray icon + Windows notifications
+
+type notifyIconData struct {
+	CbSize          uint32
+	Wnd             uintptr
+	ID              uint32
+	Flags           uint32
+	CallbackMessage uint32
+	Icon            uintptr
+	Tip             [128]uint16
+	State           uint32
+	StateMask       uint32
+	Info            [256]uint16
+	Version         uint32
+	InfoTitle       [64]uint16
+	InfoFlags       uint32
+	GuidItem        windows.GUID
+	BalloonIcon     uintptr
+}
+
+const wmTray = wmApp + 1
+
+func copyU16(dst []uint16, s string) {
+	p, _ := syscall.UTF16FromString(s)
+	if len(p) > len(dst) {
+		p = append(p[:len(dst)-1], 0)
+	}
+	copy(dst, p)
+}
+
+func (h *host) trayData() *notifyIconData {
+	inst := hinstance()
+	icon, _, _ := procLoadImageW.Call(inst, uintptr(unsafe.Pointer(u16("APP"))), 1, 0, 0, 0x00000040|0x00008000)
+	d := &notifyIconData{CbSize: uint32(unsafe.Sizeof(notifyIconData{})), Wnd: h.hwnd, ID: 1,
+		Flags: 0x1 | 0x2 | 0x4, CallbackMessage: wmTray, Icon: icon}
+	copyU16(d.Tip[:], "OVERDRIVE")
+	return d
+}
+
+func (h *host) trayAdd() {
+	if h.tray {
+		return
+	}
+	d := h.trayData()
+	if r, _, _ := procShellNotifyIconW.Call(0, uintptr(unsafe.Pointer(d))); r != 0 {
+		h.tray = true
+	}
+}
+
+func (h *host) trayRemove() {
+	if h.tray {
+		d := h.trayData()
+		procShellNotifyIconW.Call(2, uintptr(unsafe.Pointer(d)))
+		h.tray = false
+	}
+}
+
+// notify shows a Windows notification (from OVERDRIVE's tray icon). Clicking it brings the window back.
+func (h *host) notify(title, text string) {
+	h.trayAdd()
+	d := h.trayData()
+	d.Flags = 0x10 // NIF_INFO
+	copyU16(d.InfoTitle[:], title)
+	copyU16(d.Info[:], text)
+	d.InfoFlags = 0x4 | 0x10 | 0x20 // own icon, no Windows sound (OVERDRIVE plays its own), large icon
+	d.BalloonIcon = h.trayData().Icon
+	procShellNotifyIconW.Call(1, uintptr(unsafe.Pointer(d)))
+}
 
 const (
 	wmDestroy        = 0x0002
@@ -163,6 +233,7 @@ type host struct {
 	minW      int32
 	minH      int32
 	hidden    bool
+	tray      bool
 	onMessage func(h *host, m map[string]any)
 	onHotkey  func(h *host, id uintptr)
 	onClose   func(h *host) bool // return false to keep the window open
@@ -244,6 +315,12 @@ func wndProc(hwnd, msg, wp, lp uintptr) uintptr {
 				h.onCopy(h, strings.TrimRight(syscall.UTF16ToString(buf), "\x00"))
 			}
 			return 1
+		case wmTray:
+			switch lp & 0xFFFF {
+			case 0x0202, 0x0405: // left click on the tray icon / on the notification
+				bringBack(hwnd)
+			}
+			return 0
 		case wmHotkey:
 			if h.onHotkey != nil {
 				h.onHotkey(h, wp)
@@ -256,6 +333,7 @@ func wndProc(hwnd, msg, wp, lp uintptr) uintptr {
 			procDestroyWindow.Call(hwnd)
 			return 0
 		case wmDestroy:
+			h.trayRemove()
 			hostsMu.Lock()
 			delete(hosts, hwnd)
 			left := len(hosts)
@@ -339,6 +417,13 @@ func newHost(h *host, o hostOpts) bool {
 	wv.Resize()
 	wv.Navigate(h.url)
 	return true
+}
+
+// webviewArgs: sounds and music may start without a click first (OVERDRIVE's own page only).
+func webviewArgs() {
+	if os.Getenv("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS") == "" {
+		_ = os.Setenv("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--autoplay-policy=no-user-gesture-required")
+	}
 }
 
 func jsq(s string) string { b, _ := json.Marshal(s); return string(b) }
@@ -461,6 +546,7 @@ func runAppWindow(url, dataDir string) int {
 		}
 	}
 	windows.CoInitializeEx(0, windows.COINIT_APARTMENTTHREADED)
+	webviewArgs()
 	sw, _, _ := procGetSystemMetrics.Call(smCxScreen)
 	sh, _, _ := procGetSystemMetrics.Call(smCyScreen)
 	w, hgt := int32(1320), int32(880)
@@ -508,6 +594,10 @@ func runAppWindow(url, dataDir string) int {
 			}
 		case "front":
 			bringBack(h.hwnd)
+		case "notify":
+			t, _ := m["title"].(string)
+			b, _ := m["text"].(string)
+			h.notify(t, b)
 		case "minimize":
 			procShowWindow.Call(h.hwnd, swMinimize)
 		case "fullscreen":

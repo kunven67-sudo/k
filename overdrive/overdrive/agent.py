@@ -177,6 +177,8 @@ class Overdrive:
         self.btw = SideBox(self)
         from .voice import Voice
         self.voice = Voice(self.paths.data, self.events.publish, self.audit.write)
+        from .backgrounds import Backgrounds
+        self.backgrounds = Backgrounds(self.paths.data)
         from .schedule import make_schedule_tool
         self.tools.add(make_schedule_tool(self))
         self.removed_env = [] if test_env else brain.clean_env_for_plan()

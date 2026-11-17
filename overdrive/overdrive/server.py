@@ -36,7 +36,10 @@ UI = Path(__file__).resolve().parent / "ui"
 STATIC = {"app.js": "text/javascript", "md.js": "text/javascript", "p3.js": "text/javascript", "p4.js": "text/javascript",
           "fx.js": "text/javascript", "music.js": "text/javascript", "app.css": "text/css", "logo.svg": "image/svg+xml",
           "favicon.svg": "image/svg+xml"}
-CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; "
+ASSET = __import__("re").compile(r"(snd|img|fonts)/[a-z0-9_\-]{1,60}\.(mp3|ogg|png|jpg|webp|svg|woff2)")
+ASSET_TYPES = {"mp3": "audio/mpeg", "ogg": "audio/ogg", "png": "image/png", "jpg": "image/jpeg", "webp": "image/webp",
+               "svg": "image/svg+xml", "woff2": "font/woff2"}
+CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; "
        "font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'")
 
 
@@ -147,7 +150,7 @@ class Server(P4Routes):
         }
 
     def _routes(self) -> list[Route]:
-        r = [Route("/", self.index), Route("/static/{name}", self.static), Route("/api/ping", self.ping),
+        r = [Route("/", self.index), Route("/static/{name:path}", self.static), Route("/api/ping", self.ping),
              Route("/pic/{name}", self.picture)]
         for path, fn, methods in (
             ("/api/state", self.state, ["GET"]), ("/api/setup", self.setup, ["GET", "POST"]),
@@ -173,7 +176,7 @@ class Server(P4Routes):
             ("/api/memory/import", self.memory_import, ["POST"]), ("/api/memory/undo", self.memory_undo, ["POST"]),
         ):
             r.append(Route(path, fn, methods=methods))
-        for path, fn, methods in self.p4_routes():
+        for path, fn, methods in self.p4_routes() + self.p4_open_routes():
             r.append(Route(path, fn, methods=methods))
         return r
 
@@ -193,9 +196,12 @@ class Server(P4Routes):
 
     async def static(self, request: Request) -> Response:
         name = request.path_params["name"]
-        if name not in STATIC:
-            return PlainTextResponse("not found", 404)
-        return FileResponse(UI / name, media_type=STATIC[name], headers={"Cache-Control": "no-store"})
+        if name in STATIC:
+            return FileResponse(UI / name, media_type=STATIC[name], headers={"Cache-Control": "no-store"})
+        m = ASSET.fullmatch(name)            # Piece 4: sounds + pictures that ship with OVERDRIVE
+        if m and (UI / name).is_file():
+            return FileResponse(UI / name, media_type=ASSET_TYPES[m.group(2)], headers={"Cache-Control": "max-age=86400"})
+        return PlainTextResponse("not found", 404)
 
     async def picture(self, request: Request) -> Response:
         """A picture shown in a chat. <img> can't send the key header, so the key comes as ?k=."""

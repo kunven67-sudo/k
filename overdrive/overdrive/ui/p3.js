@@ -85,7 +85,7 @@ P3.feedClick = function (e) {
 };
 
 P3.settingsHtml = function (s, opt, sw, num) {
-  return P3.looksHtml(s, opt) + P3.settingsHtml2(s, opt, sw, num);
+  return P3.looksHtml(s, opt) + P4.looksHtml(s, opt) + P3.settingsHtml2(s, opt, sw, num);
 };
 P3.settingsHtml2 = function (s, opt, sw, num) {
   const voices = P3.voices().slice().sort((a, b) => a.lang.localeCompare(b.lang) || a.name.localeCompare(b.name));
@@ -1150,7 +1150,7 @@ P3.looksHtml = function (s, opt) {
     <div class="row2"><label>Text size</label><span class="range"><input type="range" data-k="text_size" min="80" max="140" step="5" value="${s.text_size}"><b data-rv-pct="text_size">${s.text_size}%</b></span></div>
     <div class="row2"><label>Accent color</label><span class="swatches">${P3.ACCENTS.map(([c, n]) => `<button type="button" class="sw${s.accent.toLowerCase() === c ? " on" : ""}" data-accent="${c}" title="${n}" style="--c:${c}"></button>`).join("")}
       <input type="color" data-k="accent" value="${esc(s.accent)}" title="Any color"></span></div>
-    <div class="hint row2"><span></span><span class="hint">Changes show right away; press Save to keep them. Moving backgrounds come in the next piece.</span></div>
+    <div class="hint row2"><span></span><span class="hint">Changes show right away; press Save to keep them.</span></div>
   </div>
   <div class="st-sec"><h3>Chats</h3>
     <div class="row2"><label>Chat names</label><select data-k="chat_names">${opt("smart", "A short real name after the first answer", s.chat_names)}${opt("first_words", "The first words of my message", s.chat_names)}</select></div>
