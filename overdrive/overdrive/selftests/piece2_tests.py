@@ -238,8 +238,11 @@ def test_chat_list_rename_delete_search():
             res = od.delete_conversation(b.id)
             assert res["tasks"] == 1 and b.id not in od.conversations and od.task_store.load(rec.id) is None
             again = Overdrive(home=Path(d), test_env={"X": "1"})                   # stays deleted after a restart
-            assert b.id not in again.conversations and again.conversations[a.id].title == "Realistic racing"
-            kinds = [e["kind"] for e in again.audit.read()] if hasattr(again.audit, "read") else None
+            try:
+                assert b.id not in again.conversations and again.conversations[a.id].title == "Realistic racing"
+                kinds = [e["kind"] for e in again.audit.read()] if hasattr(again.audit, "read") else None
+            finally:
+                again.close()                  # Windows can't delete a file that's still open
             if kinds is not None:
                 assert "chat_deleted" in kinds and "chat_renamed" in kinds
             try:
