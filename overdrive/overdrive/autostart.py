@@ -26,7 +26,8 @@ def apply(on: bool) -> str:
         return "Start with Windows needs the OVERDRIVE.exe build (it isn't running from it)."
     import winreg  # type: ignore[import-not-found]
     try:
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as k:
+        # CreateKeyEx opens the startup list, or makes it first on a PC where it doesn't exist yet
+        with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as k:
             if on:
                 winreg.SetValueEx(k, NAME, 0, winreg.REG_SZ, f'"{exe}" --background')
             else:
