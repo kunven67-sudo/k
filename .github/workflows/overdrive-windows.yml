@@ -2,7 +2,7 @@ name: OVERDRIVE Windows check
 
 on:
   push:
-    branches: [ccr-f276b31c-2voktu, claude/zen-planck-7cohjr, claude/ai-memory-chat-features-wq4mt5, error544/stoic-gauss-3y9gf4]
+    branches: [ccr-f276b31c-2voktu, claude/zen-planck-7cohjr, claude/ai-memory-chat-features-wq4mt5, error544/stoic-gauss-3y9gf4, claude/overdrive-piece-3-jckt4o]
     paths: ["overdrive/**", ".github/workflows/overdrive-windows.yml"]
   workflow_dispatch:
 
@@ -42,6 +42,15 @@ jobs:
         run: |
           $env:OVERDRIVE_TEST_CLI = "$env:USERPROFILE\.local\bin\claude.exe"
           ..\python\python.exe -E -s -X utf8 -m overdrive selftest
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Piece 3 Windows-only checks (away, PC profile, game eyes, Start with Windows, changing itself)
+        shell: pwsh
+        working-directory: overdrive/build/dist/OVERDRIVE/app
+        env:
+          OVERDRIVE_HOME: ${{ runner.temp }}\odhome3
+        run: |
+          ..\python\python.exe -E -s -X utf8 ..\..\..\win_check.py
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Launcher smoke test (OVERDRIVE.exe starts the window server)

@@ -113,11 +113,13 @@ def build_launcher(dest: Path) -> None:
         syso.unlink()
 
 
-START_HERE = """OVERDRIVE (Stage 1: Core)
+START_HERE = """OVERDRIVE 0.3.0 (Piece 3)
 
 1. Keep this whole folder together (OVERDRIVE.exe needs the python and app folders next to it).
+   Put it somewhere it can stay, like C:\\OVERDRIVE (not Downloads), so shortcuts keep working.
 2. Double-click OVERDRIVE.exe.
 3. The Setup screen installs Claude Code and signs you in with your claude.ai account (one button each).
+4. A short tour shows every part. If memory-pack.zip is here, it reads your notes into its memory once.
 
 Your stuff is saved in C:\\Users\\<you>\\OVERDRIVE (workspace, versions, logs). Deleting this folder doesn't touch it.
 More: app\\SETUP.md and app\\LIMITATIONS.md
@@ -150,6 +152,14 @@ def main() -> None:
     copy_app(OUT / "app")
     build_launcher(OUT / "OVERDRIVE.exe")
     (OUT / "START HERE.txt").write_text(START_HERE.replace("\n", "\r\n"), encoding="utf-8")
+    # Your old notes, for its memory: OVERDRIVE_MEMORY_NOTES=<notes folder> puts memory-pack.zip (text notes only)
+    # next to OVERDRIVE.exe. It is read once on first start. Only in the zip you get, never in the code repo.
+    notes = os.environ.get("OVERDRIVE_MEMORY_NOTES", "").strip()
+    if notes:
+        sys.path.insert(0, str(ROOT))
+        from overdrive.memory_import import make_pack
+        info = make_pack(Path(notes), OUT / "memory-pack.zip")
+        log(f"memory pack: {info['files']} note files, {info['bytes'] / 1e3:.0f} KB")
     zpath = DIST / "OVERDRIVE-windows.zip"
     if zpath.exists():
         zpath.unlink()
