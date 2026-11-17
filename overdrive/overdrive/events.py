@@ -20,9 +20,12 @@ class EventBus:
         self._loop = loop
 
     def publish(self, type_: str, **data: Any) -> dict:
+        # quick live bits (mic loudness, words while you talk, download progress) aren't kept for reconnects
+        keep = not (type_ in ("voice", "music") and data.get("kind") in ("level", "partial", "download", "tick"))
         with self._lock:
             ev = {"seq": next(self._seq), "type": type_, **data}
-            self._recent.append(ev)
+            if keep:
+                self._recent.append(ev)
         loop = self._loop
         try:
             running = asyncio.get_running_loop()

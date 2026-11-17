@@ -3,5 +3,5 @@
 Stage 1 ("Core"): the engine and safety system every later area plugs into.
 """
 
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 STAGE = 1

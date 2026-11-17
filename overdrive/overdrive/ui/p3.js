@@ -8,6 +8,7 @@ const P3 = {
 
 /* ---------------------------------------------------------------- hooks app.js calls */
 P3.state = function (st) {
+  P4.state(st);
   P3.paintMemCount(st.memory_counts);
   P3.renderQueue(st.queue);
   P3.paintAwayChip(st.away);
@@ -56,7 +57,7 @@ P3.event = function (ev) {
         <button class="ghost sm" data-chats-done="${esc(ev.chats.map((c) => c.id).join(","))}">Yes, move ${ev.chats.length === 1 ? "it" : "them"}</button>`);
       break;
     case "projects_done": P3.askDone(ev.ask); if (ev.marked && ev.marked.length) toast(`Marked done (nobody touched them): ${ev.marked.join(", ")}`, "ok", 8000); break;
-    default: break;
+    default: P4.event(ev); break;
   }
 };
 

@@ -175,6 +175,8 @@ class Overdrive:
         self.archive = ChatArchive(self.paths.data)
         from .btw import SideBox
         self.btw = SideBox(self)
+        from .voice import Voice
+        self.voice = Voice(self.paths.data, self.events.publish, self.audit.write)
         from .schedule import make_schedule_tool
         self.tools.add(make_schedule_tool(self))
         self.removed_env = [] if test_env else brain.clean_env_for_plan()
@@ -226,6 +228,17 @@ class Overdrive:
             else:
                 out["auth"] = await brain.auth_status(cli, env=self.accounts.env())
                 out["account"] = self.accounts.active
+                a = out["auth"]
+                if a.get("loggedIn") and self.accounts.pays() and not a.get("plan_ok"):
+                    # you turned on Pay per message for this account: an Anthropic Console sign-in is OK here
+                    a.update(plan_ok=True, plan=a.get("plan") or "Pay per message",
+                             note="Pay per message is on: every message costs money from your Anthropic Console credits.")
+                if a.get("plan") and self.accounts.extra.get(self.accounts.active, {}).get("plan") != a["plan"]:
+                    try:
+                        self.accounts.set_extra(self.accounts.active, plan=a["plan"])
+                    except ValueError:
+                        pass
+                out["long_token"] = self.accounts.has_long_token()
                 if not out["auth"].get("plan_ok"):
                     out.update(problem=out["auth"].get("note") or brain.FRIENDLY["auth"], kind="auth")
                 else:

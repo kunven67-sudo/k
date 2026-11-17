@@ -129,7 +129,25 @@ async def auth_status(cli: str, env: dict | None = None) -> dict:
         note = (f"Claude Code is signed in with '{method}', not a claude.ai plan. Runs could be billed "
                 "to an API account. Sign in with your claude.ai account instead.")
     email = str(j.get("email") or (j.get("account") or {}).get("email") or "") if isinstance(j, dict) else ""
-    return {"loggedIn": logged, "method": method, "plan_ok": plan_ok, "note": note, "email": email}
+    plan = plan_name(j.get("subscriptionType"), j.get("rateLimitTier"), method, logged)
+    if logged and plan == "Free":
+        plan_ok = False
+        note = ("This account is on the Free plan. Claude Code (OVERDRIVE's brain) only works with Pro or Max. "
+                "Pick another account, or turn on Pay per message for this account (Accounts page).")
+    return {"loggedIn": logged, "method": method, "plan_ok": plan_ok, "note": note, "email": email, "plan": plan,
+            "expires": j.get("loginExpiresAt") or ""}
+
+
+def plan_name(sub, tier, method: str, logged: bool) -> str:
+    """Pro / Max 5x / Max 20x / Team / Free / Pay per message / "" (unknown)."""
+    if not logged:
+        return ""
+    if method in ("console", "api_key", "apiKey", "anthropic_console"):
+        return "Pay per message"
+    s, t = str(sub or "").lower(), str(tier or "").lower()
+    if s == "max":
+        return "Max 20x" if "20x" in t else "Max 5x" if "5x" in t else "Max"
+    return {"pro": "Pro", "team": "Team", "enterprise": "Enterprise", "free": "Free"}.get(s, "")
 
 
 def open_console(cmd: list[str] | str, title: str = "OVERDRIVE setup", env: dict | None = None) -> None:

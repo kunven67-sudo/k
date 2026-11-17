@@ -91,7 +91,7 @@ def main() -> int:
         marker.write_text("from ..selftest import covers\n\n@covers(1, title='marker')\ndef test_marker_from_the_copy():\n"
                           "    pass\n", encoding="utf-8")
         init = (dev / "selftest.py").read_text(encoding="utf-8")
-        (dev / "selftest.py").write_text(init.replace('"piece3_tests")', '"piece3_tests", "zz_marker_tests")'), encoding="utf-8")
+        (dev / "selftest.py").write_text(init.replace('"piece4_tests")', '"piece4_tests", "zz_marker_tests")'), encoding="utf-8")
         r = run_selftests(sm.dev_root, timeout=900)
         check("its own tests run on the copy (not the old code)", r["ok"] and "test_marker_from_the_copy" in r["output"],
               r["summary"] + " | " + "; ".join(r.get("failures", [])))

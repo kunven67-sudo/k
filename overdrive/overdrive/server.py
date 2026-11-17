@@ -1,4 +1,4 @@
-"""The window: a local web page shown in an Edge app window.
+"""The window: a local page shown in OVERDRIVE's own window (OVERDRIVE.exe --window, WebView2 inside).
 
 Locked to your PC: it listens on 127.0.0.1 only, every API call needs a
 random secret made at startup, and requests from other sites are refused
@@ -33,7 +33,8 @@ from .jsonio import atomic_write_json, read_json
 from .settings import MODELS, SettingsError
 
 UI = Path(__file__).resolve().parent / "ui"
-STATIC = {"app.js": "text/javascript", "md.js": "text/javascript", "p3.js": "text/javascript", "app.css": "text/css", "logo.svg": "image/svg+xml",
+STATIC = {"app.js": "text/javascript", "md.js": "text/javascript", "p3.js": "text/javascript", "p4.js": "text/javascript",
+          "fx.js": "text/javascript", "music.js": "text/javascript", "app.css": "text/css", "logo.svg": "image/svg+xml",
           "favicon.svg": "image/svg+xml"}
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; "
        "font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'")
@@ -43,7 +44,7 @@ async def compat_info(od: Overdrive) -> dict:
     setup = await od.check_setup()
     return {"overdrive": VERSION, "stage": STAGE, "python": platform.python_version(), "os": platform.platform(),
             "agent_sdk": SDK_VERSION, "claude_code": setup.get("version") or "not found",
-            "claude_code_path": setup.get("cli") or "", "edge": find_edge() or "not found",
+            "claude_code_path": setup.get("cli") or "", "window": "own window (WebView2)" if app_exe() else ("Edge app window" if find_edge() else "browser"),
             "data_folder": str(od.paths.home), "supported": "Windows 10 (1809+) / 11, 64-bit"}
 
 
@@ -62,17 +63,35 @@ def find_edge() -> str | None:
     return None
 
 
-def open_window(url: str, profile: Path) -> None:
-    """Open the OVERDRIVE window: Edge in app mode with its own small profile."""
+def app_exe() -> Path | None:
+    """OVERDRIVE.exe (its own window maker), next to the python folder in the Windows build."""
+    for c in (os.environ.get("OVERDRIVE_EXE", ""), str(Path(sys.executable).resolve().parent.parent / "OVERDRIVE.exe")):
+        if c and c.lower().endswith(".exe") and Path(c).is_file():
+            return Path(c)
+    return None
+
+
+def open_window(url: str, profile: Path, kind: str = "window") -> str:
+    """Open OVERDRIVE's own window (WebView2, no browser). Old way (Edge app mode) only if the exe isn't there.
+    kind = "window" (the app) or "os" (OVERDRIVE OS). Returns how it was opened."""
+    if os.environ.get("OVERDRIVE_NO_WINDOW"):
+        return "none"
+    exe = app_exe() if platform.system() == "Windows" else None
+    if exe:
+        subprocess.Popen([str(exe), f"--{kind}", url, "--data", str(profile.parent / "window")],
+                         creationflags=brain.NO_WINDOW, close_fds=True, stdin=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return "app"
     edge = find_edge()
-    if edge and not os.environ.get("OVERDRIVE_NO_WINDOW"):
+    if edge:
         args = [edge, f"--app={url}", f"--user-data-dir={profile}", "--window-size=1320,880",
                 "--no-first-run", "--no-default-browser-check", "--disable-features=Translate"]
         flags = brain.NO_WINDOW if platform.system() == "Windows" else 0
         subprocess.Popen(args, creationflags=flags, close_fds=True, stdin=subprocess.DEVNULL,
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    elif not os.environ.get("OVERDRIVE_NO_WINDOW"):
-        webbrowser.open(url)
+        return "edge"
+    webbrowser.open(url)
+    return "browser"
 
 
 def open_folder(path: Path) -> None:
@@ -83,15 +102,19 @@ def open_folder(path: Path) -> None:
         subprocess.Popen(["xdg-open", str(path)])
 
 
-class Server:
+from .p4routes import P4Routes  # noqa: E402
+
+
+class Server(P4Routes):
     def __init__(self, od: Overdrive, token: str | None = None):
         self.od = od
         self.token = token or secrets.token_urlsafe(24)
         self.port = 0
         self.streams = 0
-        # +60 s grace: the first window start (Edge making its profile) can be slow on older PCs.
+        # +60 s grace: the first window start (WebView2 making its folder) can be slow on older PCs.
         self.last_stream_seen = time.monotonic() + 60
         self.selftest_running = False
+        self.signin_watch: dict[str, asyncio.Task] = {}
         self.should_exit = asyncio.Event()
         self.app = Starlette(routes=self._routes())
         self.app.add_middleware(_Guard, server=self)
@@ -149,6 +172,8 @@ class Server:
             ("/api/memory/set", self.memory_set, ["POST"]), ("/api/memory/forget", self.memory_forget, ["POST"]),
             ("/api/memory/import", self.memory_import, ["POST"]), ("/api/memory/undo", self.memory_undo, ["POST"]),
         ):
+            r.append(Route(path, fn, methods=methods))
+        for path, fn, methods in self.p4_routes():
             r.append(Route(path, fn, methods=methods))
         return r
 
@@ -212,11 +237,11 @@ class Server:
         setup = await self.od.check_setup(force=True)
         if not setup.get("cli"):
             return JSONResponse({"error": "Install Claude Code first."}, 400)
-        self.od.audit.write("setup_signin_opened", {})
-        try:
-            brain.open_console([setup["cli"], "auth", "login"], "Sign in to Claude")
-        except OSError as e:
-            return JSONResponse({"error": str(e)}, 500)
+        body = await self._json(request)
+        self.od.audit.write("setup_signin_opened", {"long": bool(body.get("long"))})
+        res = await self._signin(self.od.accounts.active, long=bool(body.get("long")))
+        if not res.get("opened"):
+            return JSONResponse({"error": res.get("note") or "couldn't open the sign-in window"}, 500)
         return JSONResponse({"ok": True})
 
     async def conversation(self, request: Request) -> Response:
@@ -262,7 +287,16 @@ class Server:
                 st = await brain.auth_status(cli, env=od.accounts.env(a["name"]))
             else:
                 st = {"loggedIn": bool(od.test_env), "plan_ok": bool(od.test_env), "method": "test", "email": ""}
-            a.update(signed_in=bool(st.get("plan_ok")), email=st.get("email", ""), note=st.get("note", ""))
+            if st.get("loggedIn") and od.accounts.pays(a["name"]) and not st.get("plan_ok"):
+                st = {**st, "plan_ok": True, "plan": st.get("plan") or "Pay per message"}
+            if st.get("plan"):
+                a["plan"] = st["plan"]
+                try:
+                    od.accounts.set_extra(a["name"], plan=st["plan"])
+                except ValueError:
+                    pass
+            a.update(signed_in=bool(st.get("plan_ok")), logged_in=bool(st.get("loggedIn")), email=st.get("email", ""),
+                     note=st.get("note", ""))
         return JSONResponse(out)
 
     async def accounts_action(self, request: Request) -> Response:
@@ -284,6 +318,25 @@ class Server:
                 od.events.publish("usage", usage=od.usage.public())
                 od.events.publish("accounts", accounts=od.accounts.public())
                 return JSONResponse(res)
+            if act == "long_signin":
+                # "Stay signed in for a year": Claude Code's setup-token prints a long code you paste here once
+                return JSONResponse(await self._signin(str(b.get("name") or ""), long=True))
+            if act == "long_token":
+                name = str(b.get("name") or "")
+                od.accounts.set_long_token(name, str(b.get("token") or ""))
+                od._setup_cache = None
+                od.audit.write("account_long_signin_saved", {"name": name, "on": bool(b.get("token"))})
+                self._kick_signin_watch(name)
+                return JSONResponse({"ok": True, "accounts": od.accounts.public()})
+            if act == "pay":
+                name, on = str(b.get("name") or ""), bool(b.get("on"))
+                od.accounts.set_extra(name, pay=on)
+                od._setup_cache = None
+                od.audit.write("account_pay_per_message", {"name": name, "on": on})
+                res: dict = {"ok": True, "pay": on}
+                if on:
+                    res.update(await self._signin(name, console=True))
+                return JSONResponse(res)
             if act == "remove":
                 od.accounts.remove(str(b.get("name") or ""))
                 od.audit.write("account_removed", {"name": b.get("name")})
@@ -292,19 +345,57 @@ class Server:
             return JSONResponse({"error": str(e)}, 400)
         return JSONResponse({"error": "unknown action"}, 400)
 
-    async def _signin(self, name: str) -> dict:
+    async def _signin(self, name: str, long: bool = False, console: bool = False) -> dict:
         od = self.od
         if od.accounts.get(name) is None:
             raise ValueError("no such account")
         cli = brain.find_cli(od.settings.get("cli_path"))
         if not cli:
             return {"opened": False, "note": "Install Claude Code first."}
+        env = {k: v for k, v in od.accounts.env(name).items() if k != "CLAUDE_CODE_OAUTH_TOKEN"}
+        cmd = [cli, "setup-token"] if long else [cli, "auth", "login", "--console" if console else "--claudeai"]
+        title = ("Stay signed in: " if long else "Sign in: ") + name
         try:
-            brain.open_console([cli, "auth", "login"], f"Sign in: {name}", env=od.accounts.env(name))
+            brain.open_console(cmd, title, env=env)
         except OSError as e:
             return {"opened": False, "note": str(e)}
-        od.audit.write("account_signin_opened", {"name": name})
+        od.audit.write("account_signin_opened", {"name": name, "kind": "year" if long else "console" if console else "claude.ai"})
+        if not long:
+            self._kick_signin_watch(name)
         return {"opened": True}
+
+    def _kick_signin_watch(self, name: str) -> None:
+        """Piece 4 fix: after you sign in, OVERDRIVE sees it by itself within a few seconds (no reload)."""
+        old = self.signin_watch.get(name)
+        if old and not old.done():
+            old.cancel()
+        self.signin_watch[name] = asyncio.create_task(self._watch_signin(name))
+
+    async def _watch_signin(self, name: str, every: float = 3.0, minutes: float = 15.0) -> None:
+        od = self.od
+        cli = brain.find_cli(od.settings.get("cli_path"))
+        if not cli:
+            return
+        end = time.monotonic() + minutes * 60
+        while time.monotonic() < end:
+            await asyncio.sleep(every)
+            try:
+                st = await brain.auth_status(cli, env=od.accounts.env(name))
+            except Exception:
+                continue
+            if st.get("loggedIn"):
+                od._setup_cache = None
+                if st.get("plan"):
+                    try:
+                        od.accounts.set_extra(name, plan=st["plan"])
+                    except ValueError:
+                        pass
+                setup = await od.check_setup(force=True)
+                od.events.publish("setup", setup=setup, account=name, plan=st.get("plan", ""),
+                                  ok=bool(st.get("plan_ok") or od.accounts.pays(name)))
+                od.events.publish("accounts", accounts=od.accounts.public())
+                od.audit.write("account_signed_in_seen", {"name": name, "plan": st.get("plan", "")})
+                return
 
     # ------------------------------------------------------------------ schedule (Piece 3)
     async def schedule_page(self, request: Request) -> Response:
@@ -855,7 +946,7 @@ def _docs_dir() -> Path:
 
 
 # ---------------------------------------------------------------------- running
-DEFAULT_PORT = 47311   # the same address every start, so Edge remembers your "Allow microphone" answer
+DEFAULT_PORT = 47311   # the same address every start (saved window settings stay with it)
 
 
 def _bind() -> socket.socket:

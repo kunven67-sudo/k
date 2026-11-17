@@ -76,6 +76,33 @@ DEFAULTS: dict[str, Any] = {
     "pictures_keep_days": 0,     # chat pictures: delete after N days (0 = keep forever)
     "pictures_max_mb": 1000,     # ...or when the folder gets bigger than this (oldest go first)
     "pc_profile": "",            # "" = read the PC by itself; or type your PC (for the no-lag check)
+    # Piece 4
+    "voice_engine": "auto",      # auto = OVERDRIVE's own offline ears in its own window; browser = Edge speech typing
+    "voice_model": "small",      # small (40 MB, fast) / better (128 MB, more accurate)
+    "voice_mic": "",             # "" = Windows' default mic
+    "sounds": True,              # click sounds, mic sounds, done / needs-you sounds
+    "sound_volume": 60,
+    "sound_pack": "studio",      # studio (real recorded clicks) / soft / arcade
+    "background": "aurora",      # moving background: aurora / nebula / rain / waves / grid / city / forest / ocean / none / custom
+    "bg_custom": "",             # your own picture or video (file name in OVERDRIVE's backgrounds folder)
+    "bg_dim": 55,                # how dark the background is behind the text (0-90)
+    "motion": "full",            # animations: full / calm / off (off = no moving stuff at all)
+    "music_vibe": "lofi",
+    "music_volume": 45,
+    "music_autoplay": False,     # start the music when OVERDRIVE opens
+    "notify": True,              # Windows notifications (done, needs you, limit, schedule)
+    "email_on": False,           # emails you important stuff (needs your Gmail app password, Settings > Email)
+    "email_address": "",         # your Gmail address (sends from it, to it)
+    "email_when": ["needs_you", "limit", "big_done", "morning"],
+    "backup_on": True,           # nightly backup of memory + chats
+    "backup_folder": "",         # "" = Documents\OVERDRIVE backups; or a USB / second drive folder
+    "backup_hour": 3,
+    "backup_keep": 14,
+    "morning_card": True,
+    "phone_remote": False,       # talk to OVERDRIVE from your phone's browser on the same Wi-Fi
+    "os_start": False,           # open OVERDRIVE OS after you sign in to Windows
+    "os_lock": False,            # OVERDRIVE OS starts with its own lock screen (your own PIN, not Windows')
+    "time_guess": True,          # "about 20 minutes, 8% of your 5 hours" before bigger jobs
 }
 
 _SCHEMA: dict[str, tuple] = {
@@ -126,7 +153,35 @@ _SCHEMA: dict[str, tuple] = {
     "pictures_keep_days": (int, lambda v: v in (0, 7, 30, 90, 365), "Keep chat pictures"),
     "pictures_max_mb": (int, lambda v: 50 <= v <= 20000, "Picture folder limit"),
     "pc_profile": (str, lambda v: len(v) <= 400, "Your PC"),
+    "voice_engine": (str, lambda v: v in ("auto", "own", "browser"), "Speech typing"),
+    "voice_model": (str, lambda v: v in ("small", "better"), "Voice pack"),
+    "voice_mic": (str, lambda v: len(v) <= 10, "Microphone"),
+    "sounds": (bool, None, "Sounds"),
+    "sound_volume": (int, lambda v: 0 <= v <= 100, "Sound volume"),
+    "sound_pack": (str, lambda v: v in ("studio", "soft", "arcade"), "Sound style"),
+    "background": (str, lambda v: v in BACKGROUNDS, "Moving background"),
+    "bg_custom": (str, lambda v: len(v) <= 200 and "/" not in v and "\\" not in v and ".." not in v, "Your background"),
+    "bg_dim": (int, lambda v: 0 <= v <= 90, "Background darkness"),
+    "motion": (str, lambda v: v in ("full", "calm", "off"), "Animations"),
+    "music_vibe": (str, lambda v: len(v) <= 40, "Music vibe"),
+    "music_volume": (int, lambda v: 0 <= v <= 100, "Music volume"),
+    "music_autoplay": (bool, None, "Music on start"),
+    "notify": (bool, None, "Windows notifications"),
+    "email_on": (bool, None, "Email me"),
+    "email_address": (str, lambda v: v == "" or bool(__import__("re").fullmatch(r"[^@\s]{1,64}@[^@\s]{1,190}\.[A-Za-z]{2,24}", v)), "Your email"),
+    "email_when": (list, lambda v: all(x in ("needs_you", "limit", "big_done", "morning", "backup_fail") for x in v), "Email me when"),
+    "backup_on": (bool, None, "Nightly backup"),
+    "backup_folder": (str, lambda v: len(v) <= 400, "Backup folder"),
+    "backup_hour": (int, lambda v: 0 <= v <= 23, "Backup time"),
+    "backup_keep": (int, lambda v: 1 <= v <= 120, "Backups to keep"),
+    "morning_card": (bool, None, "Morning card"),
+    "phone_remote": (bool, None, "Phone remote"),
+    "os_start": (bool, None, "OVERDRIVE OS after sign-in"),
+    "os_lock": (bool, None, "OVERDRIVE OS lock screen"),
+    "time_guess": (bool, None, "Time guess"),
 }
+
+BACKGROUNDS = ("aurora", "nebula", "rain", "waves", "grid", "city", "forest", "ocean", "sakura", "none", "custom")
 
 FONTS = ("default", "bahnschrift", "verdana", "georgia", "cascadia", "trebuchet")
 

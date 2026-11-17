@@ -113,7 +113,7 @@ def build_launcher(dest: Path) -> None:
         syso.unlink()
 
 
-START_HERE = """OVERDRIVE 0.3.0 (Piece 3)
+START_HERE = """OVERDRIVE 0.4.0 (Piece 4)
 
 1. Keep this whole folder together (OVERDRIVE.exe needs the python and app folders next to it).
    Put it somewhere it can stay, like C:\\OVERDRIVE (not Downloads), so shortcuts keep working.

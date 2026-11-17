@@ -28,11 +28,39 @@ class Accounts:
         self.active: str = d.get("active") or MAIN
         self.items: list[dict] = [a for a in d.get("accounts", []) if isinstance(a, dict) and a.get("name")]
         self.limits: dict[str, dict] = d.get("limits", {}) if isinstance(d.get("limits"), dict) else {}
+        # Piece 4: per account: "pay" (pay per message with an Anthropic Console sign-in, costs money),
+        # "plan" (last plan seen: Pro / Max / Free...). The year-long sign-in code lives in the SecretBox.
+        self.extra: dict[str, dict] = d.get("extra", {}) if isinstance(d.get("extra"), dict) else {}
+        from .secretbox import SecretBox
+        self.secrets = SecretBox(data_dir)
         if self.active != MAIN and not self.get(self.active):
             self.active = MAIN
 
     def _save(self) -> None:
-        atomic_write_json(self.path, {"active": self.active, "accounts": self.items, "limits": self.limits})
+        atomic_write_json(self.path, {"active": self.active, "accounts": self.items, "limits": self.limits,
+                                      "extra": self.extra})
+
+    # ---- Piece 4: plan badge, pay per message, year-long sign-in
+    def set_extra(self, name: str, **kv) -> None:
+        if self.get(name) is None:
+            raise ValueError("no such account")
+        self.extra.setdefault(name, {}).update(kv)
+        self._save()
+
+    def pays(self, name: str | None = None) -> bool:
+        return bool(self.extra.get(name or self.active, {}).get("pay"))
+
+    def set_long_token(self, name: str, token: str) -> None:
+        token = "".join(str(token or "").split())
+        if token and not re.fullmatch(r"sk-ant-oat\d*-[A-Za-z0-9_\-]{20,400}", token):
+            raise ValueError("That doesn't look like the sign-in code. It starts with sk-ant-oat and is one long line.")
+        if self.get(name) is None:
+            raise ValueError("no such account")
+        self.secrets.set(f"oauth:{name}", token)
+        self.set_extra(name, long_token=bool(token))
+
+    def has_long_token(self, name: str | None = None) -> bool:
+        return bool(self.extra.get(name or self.active, {}).get("long_token")) and self.secrets.has(f"oauth:{name or self.active}")
 
     def get(self, name: str) -> dict | None:
         if name == MAIN:
@@ -48,8 +76,14 @@ class Accounts:
 
     def env(self, name: str | None = None) -> dict:
         """Extra environment for Claude Code runs on this account ({} = the normal sign-in)."""
-        a = self.get(name or self.active)
-        return {"CLAUDE_CONFIG_DIR": a["dir"]} if a and a.get("dir") else {}
+        n = name or self.active
+        a = self.get(n)
+        env = {"CLAUDE_CONFIG_DIR": a["dir"]} if a and a.get("dir") else {}
+        if self.extra.get(n, {}).get("long_token"):
+            tok = self.secrets.get(f"oauth:{n}")
+            if tok:
+                env["CLAUDE_CODE_OAUTH_TOKEN"] = tok      # the year-long sign-in: no codes to type for a year
+        return env
 
     def add(self, name: str) -> dict:
         name = " ".join(str(name or "").split())[:40]
@@ -118,4 +152,6 @@ class Accounts:
     def public(self) -> dict:
         return {"active": self.active,
                 "accounts": [{"name": n, "main": n == MAIN, "active": n == self.active,
+                              "plan": self.extra.get(n, {}).get("plan", ""), "pay": self.pays(n),
+                              "long_token": self.has_long_token(n),
                               "limits": self.limits.get(n, {}) if n != self.active else None} for n in self.names()]}

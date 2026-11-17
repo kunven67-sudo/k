@@ -240,6 +240,16 @@ function handle(ev) {
     case "selftest": onTestProgress(ev.name, ev.result); break;
     case "selftest_done": onTestsDone(ev.summary); break;
     case "log": if (S.tab === "logs") debounceLogs(); break;
+    case "setup": {
+      S.setup = ev.setup; renderBrain(); renderSetup();
+      if (ev.setup && ev.setup.ready) {
+        const was = !$("#setup").classList.contains("hidden");
+        $("#setup").classList.add("hidden");
+        if (was || ev.account) { toast(`Signed in${ev.plan ? ` (${ev.plan})` : ""}. You're good to go.`, "ok", 6000); P4.sound("success"); }
+        P3.maybeTour();
+      } else if (ev.setup && ev.ok === false) toast(ev.setup.problem || "Signed in, but this account can't be used yet.", "warn", 12000);
+      break;
+    }
     default: P3.event(ev); break;
   }
 }
@@ -745,10 +755,18 @@ function renderSetup() {
       <div class="cmd">winget: winget install --id Anthropic.ClaudeCode -e<br>PowerShell: irm https://claude.ai/install.ps1 | iex</div>`}
     </div></div>
     <div class="sstep"><div class="n ${signed ? "ok" : installed ? "bad" : ""}">${signed ? "&#10003;" : "2"}</div><div>
-      <h3>${signed ? "Signed in with your claude.ai plan" : "Sign in with your claude.ai account"}</h3>
-      ${signed ? `<div class="muted">Method: ${esc((s.auth || {}).method || "")}</div>` : `<div class="muted">${installed ? esc(s.problem || "A window opens, then your browser: pick your claude.ai account (Pro or Max) and press Allow.") : "Do step 1 first."}</div>
-      ${installed ? `<div class="btns" style="margin-top:8px"><button class="primary" data-signin>Sign in</button></div>` : ""}`}
+      <h3>${signed ? `Signed in${(s.auth || {}).plan ? ` <span class="plan-badge p-${esc(((s.auth || {}).plan || "").split(" ")[0].toLowerCase())}">${esc(s.auth.plan)}</span>` : ""}` : "Sign in with your claude.ai account"}</h3>
+      ${signed ? `<div class="muted">${(s.auth || {}).email ? esc(s.auth.email) + " &middot; " : ""}${s.long_token ? "stays signed in for a year" : "normal sign-in"}</div>` : `<div class="muted">${installed ? esc(s.problem || "A window opens, then your browser: pick your claude.ai account (Pro or Max) and press Allow.") : "Do step 1 first."}</div>
+      ${installed ? `<div class="btns" style="margin-top:8px"><button class="primary" data-signin>Sign in</button></div>
+      <div class="muted wait-line hidden" id="signin-wait"><span class="spin"></span>Waiting for you to press Allow in the browser... it updates by itself.</div>` : ""}`}
     </div></div>
+    ${installed ? `<div class="sstep"><div class="n ${s.long_token ? "ok" : ""}">${s.long_token ? "&#10003;" : "3"}</div><div>
+      <h3>Stay signed in for a year <span class="muted" style="font-weight:400">(optional, no more codes)</span></h3>
+      ${s.long_token ? `<div class="muted">On. You won't be asked to sign in again for about a year.</div>` : `<div class="muted">Normal sign-ins can run out and ask for a code from your email or phone. This makes one long sign-in code instead:
+        press the button, press Allow in the browser, then copy the long code the window shows (it starts with <span class="mono">sk-ant-oat</span>) and paste it here. Needs Pro or Max.</div>
+      <div class="btns" style="margin-top:8px"><button data-longsignin>Make my year-long code</button></div>
+      <div class="imp-row" style="margin-top:8px"><input id="long-code" type="password" placeholder="Paste the code here" autocomplete="off" spellcheck="false"><button class="primary" data-longsave>Save</button></div>`}
+    </div></div>` : ""}
     ${removed.length ? `<div class="muted" style="margin-top:8px">Note: OVERDRIVE ignores ${removed.map(esc).join(", ")} on this PC so it can never bill an API account.</div>` : ""}`;
   $$("[data-install]").forEach((b) => b.addEventListener("click", async () => {
     try { await api("/api/setup/install", { method: b.dataset.install }); toast("Installer window opened. When it finishes, press Check again.", "ok", 9000); }
@@ -756,7 +774,20 @@ function renderSetup() {
   }));
   const si = $("[data-signin]");
   if (si) si.addEventListener("click", async () => {
-    try { await api("/api/setup/signin", {}); toast("Sign-in window opened. After you press Allow in the browser, press Check again.", "ok", 9000); }
+    try { await api("/api/setup/signin", {}); toast("Sign-in window opened. Press Allow in the browser: OVERDRIVE sees it by itself.", "ok", 7000); $("#signin-wait") && $("#signin-wait").classList.remove("hidden"); }
+    catch (e) { toast(e.message, "bad", 9000); }
+  });
+  const ls = $("[data-longsignin]");
+  if (ls) ls.addEventListener("click", async () => {
+    try { await api("/api/setup/signin", { long: true }); toast("A window opened. Press Allow in the browser, then copy the long code it shows and paste it here.", "ok", 10000); }
+    catch (e) { toast(e.message, "bad", 9000); }
+  });
+  const lsave = $("[data-longsave]");
+  if (lsave) lsave.addEventListener("click", async () => {
+    const code = $("#long-code").value.trim();
+    if (!code) { toast("Paste the code first.", "warn"); return; }
+    try { await api("/api/accounts/action", { action: "long_token", name: (S.state && S.state.accounts && S.state.accounts.active) || "main", token: code });
+      $("#long-code").value = ""; toast("Saved. It stays signed in for about a year now.", "ok", 6000); checkSetup(true, true); }
     catch (e) { toast(e.message, "bad", 9000); }
   });
   $("#setup-go").disabled = !s.ready;

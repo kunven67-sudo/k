@@ -1,3 +1,6 @@
 # Windows build = requirements.txt + Windows-only dependencies (pip on Linux can't see these markers).
 -r requirements.txt
 pywin32==312
+# Piece 4: OVERDRIVE's own ears (offline speech typing) for its own window
+# (Vosk itself is downloaded with the voice pack the first time you use the mic: keeps the zip small)
+sounddevice==0.5.6

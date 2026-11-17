@@ -1,8 +1,13 @@
-// OVERDRIVE.exe: starts OVERDRIVE's bundled Python with no console window.
+// OVERDRIVE.exe: OVERDRIVE's own app.
 //
-// Python is started with CREATE_NO_WINDOW, so it gets a hidden console. Claude Code
-// (started later by Python) shares that hidden console, so no black windows pop up.
-// No keyboard hooks, no PowerShell, no admin rights.
+//	OVERDRIVE.exe                 starts OVERDRIVE's bundled Python (the brain side) with no console window.
+//	                              Python then opens the window by starting "OVERDRIVE.exe --window <address>".
+//	OVERDRIVE.exe --window URL    OVERDRIVE's own window (WebView2, the engine Windows apps like Teams use).
+//	                              No Edge browser, no tabs, no address bar. Only one window: a second start
+//	                              brings the first one back.
+//	OVERDRIVE.exe --os URL        OVERDRIVE OS: a full-screen desktop with its own taskbar on top of Windows.
+//
+// No keyboard hooks (hotkeys use RegisterHotKey), no PowerShell, no admin rights.
 package main
 
 import (
@@ -16,14 +21,32 @@ import (
 const createNoWindow = 0x08000000
 
 func messageBox(title, text string) {
-	user32 := syscall.NewLazyDLL("user32.dll")
-	proc := user32.NewProc("MessageBoxW")
 	t, _ := syscall.UTF16PtrFromString(title)
 	m, _ := syscall.UTF16PtrFromString(text)
-	proc.Call(0, uintptr(unsafe.Pointer(m)), uintptr(unsafe.Pointer(t)), 0x10)
+	procMessageBoxW.Call(0, uintptr(unsafe.Pointer(m)), uintptr(unsafe.Pointer(t)), 0x10)
+}
+
+func argAfter(args []string, flag string) string {
+	for i, a := range args {
+		if a == flag && i+1 < len(args) {
+			return args[i+1]
+		}
+	}
+	return ""
 }
 
 func main() {
+	args := os.Args[1:]
+	if u := argAfter(args, "--window"); u != "" {
+		os.Exit(runAppWindow(u, argAfter(args, "--data")))
+	}
+	if u := argAfter(args, "--os"); u != "" {
+		os.Exit(runShell(u, argAfter(args, "--data")))
+	}
+	startPython(args)
+}
+
+func startPython(args []string) {
 	exe, err := os.Executable()
 	if err != nil {
 		messageBox("OVERDRIVE", "Can't find where OVERDRIVE.exe is: "+err.Error())
@@ -37,9 +60,10 @@ func main() {
 			"Unzip the whole OVERDRIVE folder first (don't run it from inside the zip), then open OVERDRIVE.exe again.")
 		os.Exit(1)
 	}
-	args := append([]string{"-E", "-s", "-X", "utf8", "-m", "overdrive"}, os.Args[1:]...)
-	cmd := exec.Command(py, args...)
+	pargs := append([]string{"-E", "-s", "-X", "utf8", "-m", "overdrive"}, args...)
+	cmd := exec.Command(py, pargs...)
 	cmd.Dir = app
+	cmd.Env = append(os.Environ(), "OVERDRIVE_EXE="+exe)
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: createNoWindow}
 	if err := cmd.Start(); err != nil {
 		messageBox("OVERDRIVE", "Couldn't start OVERDRIVE: "+err.Error())
