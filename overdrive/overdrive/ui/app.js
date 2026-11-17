@@ -511,6 +511,7 @@ function cardNode(c) {
       prev = `<div class="build-plan"><div>${esc(p.plan)}</div>
         ${(p.steps || []).length ? `<ol>${p.steps.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>` : ""}
         <div class="muted">Model: <b>${esc(p.model || "")}</b>${p.now && p.now !== p.model ? ` (now: ${esc(p.now)})` : ""}</div>
+        ${p.usage_guess ? `<div class="usage-guess">${esc(p.usage_guess)}</div>` : ""}
         ${p.note ? `<div class="muted">${esc(p.note)}</div>` : ""}</div>`;
     } else if (p.command !== undefined) {
       prev = `${p.what ? `<div class="muted">${esc(p.what)}</div>` : ""}<div class="prev mono">${esc(p.command)}</div>`;
@@ -534,6 +535,12 @@ function cardNode(c) {
       <div class="card-actions"><button class="ok" data-yes>Yes, do it</button><button data-no>No</button>
         <input data-note placeholder="Optional note for Claude (why No, or what to change)" maxlength="500">
         <span class="count" data-count></span></div>`;
+    if (b.tool === "start_build" && p.plan) {
+      const later = document.createElement("button");
+      later.textContent = "Schedule it for later"; later.className = "ghost";
+      later.addEventListener("click", () => P3.scheduleInstead(c, p));
+      $(".card-actions", el).insertBefore(later, $("[data-note]", el));
+    }
     $("[data-yes]", el).addEventListener("click", () => answerCard(c.id, "yes", null, $("[data-note]", el).value));
     $("[data-no]", el).addEventListener("click", () => answerCard(c.id, "no", null, $("[data-note]", el).value));
   } else {

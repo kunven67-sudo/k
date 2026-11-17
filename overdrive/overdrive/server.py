@@ -142,7 +142,7 @@ class Server:
             ("/api/queue", self.queue_action, ["POST"]),
             ("/api/accounts", self.accounts_page, ["GET"]), ("/api/accounts/action", self.accounts_action, ["POST"]),
             ("/api/schedule", self.schedule_page, ["GET"]), ("/api/schedule/action", self.schedule_action, ["POST"]),
-            ("/api/chat/done", self.chat_done, ["POST"]), ("/api/selfmod", self.selfmod_page, ["GET", "POST"]), ("/api/feelings", self.feelings_action, ["POST"]), ("/api/imported", self.imported, ["GET", "POST"]), ("/api/upload", self.upload, ["POST"]),
+            ("/api/chat/done", self.chat_done, ["POST"]), ("/api/timemachine", self.timemachine, ["GET", "POST"]), ("/api/selfmod", self.selfmod_page, ["GET", "POST"]), ("/api/feelings", self.feelings_action, ["POST"]), ("/api/imported", self.imported, ["GET", "POST"]), ("/api/upload", self.upload, ["POST"]),
             ("/api/edit", self.edit, ["POST"]), ("/api/interrupted", self.interrupted, ["POST"]), ("/api/btw", self.btw_ask, ["POST"]),
             ("/api/away", self.away_page, ["GET"]), ("/api/away/action", self.away_action, ["POST"]),
             ("/api/memory", self.memory_page, ["GET"]), ("/api/memory/edit", self.memory_edit, ["POST"]),
@@ -379,6 +379,29 @@ class Server:
         except (ValueError, KeyError, Busy) as e:
             return JSONResponse({"error": str(e)}, 400)
         return JSONResponse({"error": "unknown action"}, 400)
+
+    async def timemachine(self, request: Request) -> Response:
+        tm = self.od.timemachine
+        if request.method == "GET":
+            return JSONResponse({"versions": tm.versions(request.query_params.get("project", ""))})
+        b = await self._json(request)
+        name, vid, act = str(b.get("project") or ""), str(b.get("version") or ""), str(b.get("action") or "")
+        try:
+            if act == "save":
+                v = await asyncio.to_thread(tm.snapshot, name, "saved by you")
+                res = {"saved": bool(v)}
+            elif act == "open_copy":
+                res = {"folder": await asyncio.to_thread(tm.open_copy, name, vid)}
+            elif act == "go_back":
+                if self.od.current is not None and not self.od.current.rec.background:
+                    return JSONResponse({"error": "Wait until the running task is finished."}, 409)
+                res = await asyncio.to_thread(tm.go_back, name, vid)
+            else:
+                return JSONResponse({"error": "unknown action"}, 400)
+        except (ValueError, OSError) as e:
+            return JSONResponse({"error": str(e)}, 400)
+        self.od.audit.write("timemachine_" + act, {"project": name, "version": vid, "by": "you"})
+        return JSONResponse(res)
 
     async def selfmod_page(self, request: Request) -> Response:
         sm = self.od.selfmod

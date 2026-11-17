@@ -138,6 +138,9 @@ P3.bind = function () {
   $("#tour").addEventListener("click", P3.tourClick);
   P3.bind5b();
   $("#mind-chip").addEventListener("click", P3.showMind);
+  $("#live-toggle").addEventListener("click", () => P3.toggleLive());
+  $("#live-x").addEventListener("click", () => P3.toggleLive(false));
+  $("#live-body").addEventListener("click", (e) => { if (e.target.closest("[data-livepic]") && P3.live.task) { LB.pics = (P3.live.task.pictures || []).filter((x) => x && x.file); LB.i = LB.pics.length - 1; if (LB.pics.length) { showPicture(); $("#lightbox").classList.remove("hidden"); } } });
   $("#drawer-body").addEventListener("click", P3.mindClick);
   $("#btw-toggle").addEventListener("click", () => { if ($("#btw").classList.contains("hidden")) P3.openBtw(true); else { $("#btw").classList.add("hidden"); $("#btw-toggle").classList.remove("on"); } });
   $("#btw-x").addEventListener("click", () => { $("#btw").classList.add("hidden"); $("#btw-toggle").classList.remove("on"); });
@@ -521,6 +524,7 @@ P3.onDelta = function (ev) {
   if (say) P3.say(say);
 };
 P3.onTask = function (t) {
+  P3.liveTask(t);
   if (P3.v.mode) P3.paintVoice();
   if (t.status === "running" || P3.v.done.has(t.id)) return;
   P3.v.done.add(t.id);
@@ -630,7 +634,7 @@ P3.renderAway = function () {
       <td class="muted">${esc(P3.ago(p.checked))}</td>
       ${s.bug_scope === "picked" ? `<td><input type="checkbox" data-pick="${esc(p.name)}" ${(s.bug_picked || []).includes(p.name) ? "checked" : ""} ${p.done ? "disabled" : ""}></td>` : ""}
       <td><label class="switch"><input type="checkbox" data-pdone="${esc(p.name)}" ${p.done ? "checked" : ""}> done</label></td>
-      <td><button class="ghost xs" data-pcheck="${esc(p.name)}" ${p.done ? "disabled" : ""}>Check now</button></td></tr>`).join("");
+      <td><button class="ghost xs" data-pcheck="${esc(p.name)}" ${p.done ? "disabled" : ""}>Check now</button><button class="ghost xs" data-pversions="${esc(p.name)}">Versions</button></td></tr>`).join("");
   const groups = {};
   for (const b of d.bugs) (groups[b.project] = groups[b.project] || []).push(b);
   const bugs = Object.entries(groups).map(([proj, list]) => `<div class="bug-group"><h4>${esc(proj)} <span class="muted">${list.length}</span></h4>
@@ -684,6 +688,8 @@ P3.awayClick = async function (e) {
   const t = e.target;
   const segB = t.closest("[data-seg]");
   if (segB) { const k = segB.dataset.seg, v = segB.dataset.v; if (await P3.setNow({ [k]: k === "away_learn_cap" ? Number(v) : v })) P3.loadAway(); return; }
+  const pv = t.closest("[data-pversions]");
+  if (pv) { P3.showVersionsOf(pv.dataset.pversions); return; }
   const chk = t.closest("[data-pcheck]");
   if (chk) {
     chk.disabled = true; chk.textContent = "Checking...";
@@ -1149,6 +1155,8 @@ P3.looksHtml = function (s, opt) {
     <div class="row2"><label>Chat pictures</label><span class="inl"><select data-k="pictures_keep_days">${[[0, "Keep forever"], [7, "Delete after 7 days"], [30, "Delete after 30 days"], [90, "Delete after 90 days"], [365, "Delete after a year"]].map(([v, l]) => `<option value="${v}" ${Number(s.pictures_keep_days) === v ? "selected" : ""}>${l}</option>`).join("")}</select>
       <select data-k="pictures_max_mb">${[[200, "or over 200 MB"], [500, "or over 500 MB"], [1000, "or over 1 GB"], [5000, "or over 5 GB"]].map(([v, l]) => `<option value="${v}" ${Number(s.pictures_max_mb) === v ? "selected" : ""}>${l}</option>`).join("")}</select></span></div>
     <div class="hint row2"><span></span><span class="hint">Old chat pictures get deleted after that time, or the oldest ones when the folder gets too big. Checked each time OVERDRIVE starts.</span></div>
+    <div class="row2"><label>Your PC (no-lag check)</label><input data-k="pc_profile" maxlength="400" value="${esc(s.pc_profile || "")}" placeholder="Automatic (it reads your CPU, RAM and graphics card)"></div>
+    <div class="hint row2"><span></span><span class="hint">Every game it builds must run smooth on this PC: auto quality, light textures, and it tests the frame rate.</span></div>
   </div>`;
 };
 P3.bind5b = function () {
@@ -1338,4 +1346,70 @@ P3.showVersions = async function () {
     if (!confirm("Go back to that version? OVERDRIVE restarts.")) return;
     try { await api("/api/selfmod", { name: b.dataset.goback }); } catch (e) { toast(e.message, "bad"); }
   }));
+};
+
+
+/* ================================================================ Part 5d: live view, schedule instead, versions, your PC */
+P3.live = { task: null };
+P3.liveOpen = () => !$("#live").classList.contains("hidden");
+P3.toggleLive = function (on) {
+  const show = on === undefined ? !P3.liveOpen() : on;
+  $("#live").classList.toggle("hidden", !show);
+  $("#live-toggle").classList.toggle("on", show);
+  $("#tab-chat").classList.toggle("live-open", show);
+  if (show) P3.paintLive();
+};
+P3.paintLive = function () {
+  if (!P3.liveOpen()) return;
+  const t = P3.live.task || (S.state && S.state.current) || null;
+  const body = $("#live-body");
+  if (!t) { body.innerHTML = `<div class="muted live-empty">Nothing running right now. When it works, every step shows up here live: commands, files it changes, and screenshots from its game eyes.</div>`; return; }
+  const calls = (t.calls || []).filter((c) => c.tool !== "task_plan");
+  const last = calls[calls.length - 1];
+  const pic = (t.pictures || []).slice(-1)[0];
+  const running = t.status === "running";
+  body.innerHTML = `<div class="live-now ${running ? "on" : ""}">${running ? `<span class="spin"></span> Working` : `<b>${esc(WORDS[t.status] || t.status)}</b>`}<span class="muted"> &middot; ${esc((t.request || "").slice(0, 80))}</span></div>
+    ${last ? `<div class="live-step"><span class="muted">${running ? "Now" : "Last"}:</span> <b>${esc(last.title || last.tool)}</b> <span class="mono">${esc((last.args && (last.args.command || last.args.path || last.args.file_path || last.args.query || last.args.action)) || "")}</span></div>` : ""}
+    ${pic ? `<figure class="live-pic" data-livepic><img src="${picUrl(pic)}" alt=""><figcaption>${esc(pic.title || "")}</figcaption></figure>` : ""}
+    <div class="live-steps">${calls.slice(-10).reverse().map((c) => `<div class="ls ${c.ok === false ? "bad" : c.ok === null ? "wait" : "ok"}"><i></i><span>${esc(c.title || c.tool)}</span><span class="muted">${c.ms ? c.ms + " ms" : ""}</span></div>`).join("")}</div>
+    ${(t.changes || []).length ? `<div class="live-files"><div class="muted">Files changed</div>${t.changes.slice(-8).map((c) => `<div class="mono">${esc(c.path)}</div>`).join("")}</div>` : ""}`;
+};
+P3.liveTask = function (t) {
+  if (t.background && !P3.liveOpen()) return;
+  if (t.status === "running" || !P3.live.task || P3.live.task.id === t.id) P3.live.task = t;
+  P3.paintLive();
+};
+P3.scheduleInstead = function (card, p) {
+  answerCard(card.id, "no", null, "Not now: I scheduled this for when my 5-hour usage resets.");
+  switchTab("schedule");
+  P3.sched.editing = "new";
+  P3.loadSchedule().then(() => {
+    $("#sj-text").value = "Build this (we planned it already): " + p.plan + ((p.steps || []).length ? "\nSteps: " + p.steps.join("; ") : "");
+    $("#sj-mode").value = "build";
+    $("#sj-when").value = "usage_reset"; $("#sj-at").disabled = true; $("#sj-repeat").disabled = true;
+    $("#sj-title").value = p.plan.slice(0, 60);
+    toast("Pick when, then press Add to schedule.", "ok", 5000);
+  });
+};
+P3.showVersionsOf = async function (project) {
+  let d;
+  try { d = await api(`/api/timemachine?project=${encodeURIComponent(project)}`); } catch (e) { toast(e.message, "bad"); return; }
+  $("#drawer-body").innerHTML = `<h2 style="margin-top:0">${esc(project)}: every version</h2>
+    <p class="muted">A version is saved after each build that changed it. <b>Open a copy</b> puts an old version next to the current one (nothing is lost). <b>Go back</b> makes it the current one (the current one is saved first).</p>
+    <div class="btns" style="margin-bottom:12px"><button class="ghost" data-tmsave>Save a version now</button></div>
+    ${d.versions.length ? d.versions.map((v, i) => `<div class="tmv"><div><b>${esc(new Date(v.when).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }))}</b>${i === 0 ? ` <span class="chip">newest</span>` : ""}
+        <div class="muted">${esc(v.why)} &middot; ${v.files} files</div></div>
+        <div class="btns"><button class="ghost xs" data-tmopen="${esc(v.id)}">Open a copy</button>${i ? `<button class="ghost xs" data-tmback="${esc(v.id)}">Go back to this one</button>` : ""}</div></div>`).join("")
+      : `<div class="muted">No versions yet. One is saved after the next build that changes it, or press Save a version now.</div>`}`;
+  $("#drawer").classList.remove("hidden");
+  const act = async (action, version) => {
+    try {
+      const r = await api("/api/timemachine", { action, project, version });
+      toast(action === "open_copy" ? `Opened a copy in ${r.folder}` : action === "go_back" ? "Went back. The newer version was saved first." : r.saved ? "Saved a version." : "Nothing changed since the last version.", "ok", 6000);
+      P3.showVersionsOf(project);
+    } catch (e) { toast(e.message, "bad"); }
+  };
+  $$("[data-tmopen]").forEach((b) => b.addEventListener("click", () => act("open_copy", b.dataset.tmopen)));
+  $$("[data-tmback]").forEach((b) => b.addEventListener("click", () => { if (confirm("Go back to this version? The current one is saved first.")) act("go_back", b.dataset.tmback); }));
+  $("[data-tmsave]").addEventListener("click", () => act("save", ""));
 };

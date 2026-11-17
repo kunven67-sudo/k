@@ -46,6 +46,7 @@
         <div class="bar-title" id="chat-title">New chat</div>
         <div class="bar-right">
           <span id="chip-model" class="chip"></span>
+          <button id="live-toggle" class="ghost sm" title="Watch what it's doing, live (steps, screenshots, files)">Live view</button>
           <button id="btw-toggle" class="ghost sm" title="Ask a quick side question without stopping the job (Ctrl+B)">By the way</button>
           <button id="stop" class="danger hidden" title="Stop the running task now">STOP</button>
         </div>
@@ -64,6 +65,10 @@
           </div>
         </div>
       </div>
+      <aside id="live" class="live hidden" aria-label="Live view">
+        <div class="btw-head"><b>Live view</b><span class="muted">what it's doing right now</span><button class="bn-x" id="live-x" title="Close">&times;</button></div>
+        <div id="live-body" class="live-body"></div>
+      </aside>
       <aside id="btw" class="btw hidden" aria-label="By the way">
         <div class="btw-head"><b>By the way</b><span class="muted">quick side questions, the main job keeps going</span><button class="bn-x" id="btw-x" title="Close">&times;</button></div>
         <div id="btw-list" class="btw-list"></div>

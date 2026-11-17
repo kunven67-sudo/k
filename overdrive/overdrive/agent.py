@@ -101,6 +101,7 @@ class RunState:
     tool_use_ids: dict[str, tuple[str, dict]] = field(default_factory=dict)
     file_changes: dict[str, dict] = field(default_factory=dict)          # workspace file -> change record (Undo)
     build_go: dict | None = None                                          # start_build said Yes: continue in Build mode
+    fh_before: float | None = None                                        # 5-hour meter when it started (usage guess)
 
     def final_text(self) -> str:
         if not self.texts:
@@ -156,6 +157,15 @@ class Overdrive:
         from .feelings import Feelings, make_upgrade_tool
         self.feelings = Feelings(self.paths.data)
         self.tools.add(make_upgrade_tool(self))
+        from .assets import register_asset_tools
+        from .checks import UsageHistory, make_rules_tool
+        from .timemachine import TimeMachine
+        register_asset_tools(self.tools)
+        self.tools.add(make_rules_tool(self))
+        self.timemachine = TimeMachine(self.paths.home, self.projects)
+        self.usage_hist = UsageHistory(self.paths.data)
+        from .gameeyes import make_game_eyes_tool
+        self.tools.add(make_game_eyes_tool(self))
         from .selfmod import SelfMod, make_selfmod_tools
         self.selfmod = SelfMod(self.paths.home, self.paths.workspace, self.paths.data)
         for spec in make_selfmod_tools(self):
@@ -486,6 +496,13 @@ class Overdrive:
         self.grants.issue(spec.name, inp)
         return PermissionResultAllow()
 
+    def _usage_guess_text(self, model: str) -> str:
+        g = self.usage_hist.guess("build", model)
+        if g is None:
+            return "No guess yet: it learns how much a build uses after a few builds."
+        return (f"Builds like this used about {g['pct']:.0f}% of your 5-hour limit (up to {g['high']:.0f}%, "
+                f"from your last {g['n']}).")
+
     MEMORY_AUTO_PER_TASK = 8
 
     def _memory_needs_ask(self, st: RunState, name: str, inp: dict) -> str:
@@ -799,6 +816,7 @@ class Overdrive:
                             "steps": [str(x)[:300] for x in (inp.get("steps") or [])[:20]],
                             "model": f"{model or cur_model} + {effort or cur_effort} effort",
                             "now": f"{cur_model} + {cur_effort} effort",
+                            "usage_guess": self._usage_guess_text(model or cur_model),
                             "note": ("Yes = start building with this model." if not auto_model else
                                      "Yes = start building (the model switches by itself, your setting).")},
                 "network": False}
@@ -1038,7 +1056,7 @@ class Overdrive:
                         self.events.publish("warning", task=rec.id,
                                             text=f"Heads up: {res.source} contains text that looks like orders "
                                                  f"for the AI ({', '.join(flags)}). It was treated as data only.")
-                    res = ToolResult(text=boxed, is_error=False, changes=res.changes, data=res.data)
+                    res = ToolResult(text=boxed, is_error=False, changes=res.changes, data=res.data, images=res.images)
                 if fp and not res.is_error:
                     st.journal.cache_put(spec.name, args, fp, res.text)
         ms = int((time.perf_counter() - t0) * 1000)
@@ -1063,7 +1081,12 @@ class Overdrive:
                                          "inputs": args, "output": res.text, "changes": res.changes}, task=rec.id)
         self.task_store.save(rec)
         self._emit_task(rec)
-        return {"content": [{"type": "text", "text": res.text}], "is_error": res.is_error}
+        content: list[dict] = [{"type": "text", "text": res.text}]
+        if res.images and not res.is_error:
+            import base64
+            content += [{"type": "image", "data": base64.b64encode(png).decode(), "mimeType": "image/png"}
+                        for png in res.images[:3]]
+        return {"content": content, "is_error": res.is_error}
 
     def _fingerprint(self, spec: ToolSpec, args: dict) -> str | None:
         try:
@@ -1099,8 +1122,8 @@ class Overdrive:
             tools=list(builtin.BUILD_TOOLS if mode == "build" else builtin.CHAT_TOOLS), allowed_tools=[],
             mcp_servers={ToolRegistry.MCP_SERVER: self._sdk_server(st)},
             strict_mcp_config=True, setting_sources=[],
-            system_prompt=build_system_prompt(s, memory_digest=self.memory.digest() + "\n\n" + self.feelings.prompt_block(),
-                                              mode=mode),
+            system_prompt=build_system_prompt(s, memory_digest=self.memory.digest() + "\n\n" + self.feelings.prompt_block()
+                                              + "\n\n" + _pc_block(s), mode=mode),
             permission_mode="default", can_use_tool=self._make_gate(st), model=model,
             fallback_model=fallback, effort=st.conv.effort or s.get("effort"), max_turns=int(s.get("max_steps")),
             max_budget_usd=budget, cwd=str(self.paths.workspace), cli_path=cli, env=env,
@@ -1199,6 +1222,7 @@ class Overdrive:
                 st.limit = why
                 return await self._finish(st)
             rec.cli_version = setup.get("version") or ""
+            st.fh_before = self.away.five_hour()
             watchdog = asyncio.create_task(self._watchdog(st))
             for attempt in (1, 2):
                 text = ""
@@ -1321,6 +1345,9 @@ class Overdrive:
                     status, note = merge_double_check(status, verdict)
                     checks.append({"name": "Second check (fresh Claude)", "ok": verdict.get("status") == "done",
                                    "detail": str(verdict.get("reason", ""))[:400], "kind": "check"})
+            if rec.mode == "build" and rec.changes and not any(c.get("tool") == "rules_check" for c in rec.calls):
+                checks.append({"name": "Checked your rules before handing it over", "ok": False, "kind": "check",
+                               "detail": "It didn't run rules_check this time, so your saved rules weren't double-checked."})
             rec.status, rec.checks = status, checks
             rec.status_reason = (note + " " + reason).strip() if note else reason
             rec.summary = str((rec.report or {}).get("summary") or "")[:600]
@@ -1351,6 +1378,18 @@ class Overdrive:
                                 resets_at=fh.get("resets_at"), text=st.limit or st.error_text)
         if self.restart_requested:
             self.events.publish("restart", why="installed its own change")
+        if res is not None and not rec.background and st.fh_before is not None:
+            after = self.away.five_hour()
+            if after is not None and after >= st.fh_before:
+                self.usage_hist.add(rec.mode, rec.model, after - st.fh_before, rec.turns)
+        if rec.mode == "build" and rec.changes and not st.error_kind:
+            try:
+                saved = self.timemachine.after_build(rec)
+                if saved:
+                    rec.flags.append("Time machine: saved a version of " + ", ".join(saved) + ".")
+                    self.task_store.save(rec)
+            except Exception as e:
+                self.audit.write("timemachine_error", {"error": repr(e)[:300]})
         if not rec.background:
             try:
                 self.feelings.on_task(rec.status, rec.request, rec.status_reason if rec.status in ("failed", "blocked") else "")
@@ -1592,6 +1631,14 @@ class Overdrive:
         out.write_bytes(buf.getvalue())
         self.audit.write("export", {"file": out.name, "bytes": out.stat().st_size})
         return out
+
+
+def _pc_block(settings) -> str:
+    try:
+        from .pcinfo import prompt_block
+        return prompt_block(settings.get("pc_profile"))
+    except Exception:
+        return ""
 
 
 def _first_words(text: str, limit: int = 48) -> str:

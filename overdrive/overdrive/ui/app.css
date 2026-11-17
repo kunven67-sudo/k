@@ -693,3 +693,25 @@ button.xs:hover { color: var(--text); border-color: var(--line2); }
 .restarting { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; background: rgba(8, 9, 12, .92); text-align: center; }
 .mb .ub { grid-column: auto; margin-top: 0; }
 .net-light, .acct-chip { height: 24px; line-height: 1; }
+
+/* ---------------------------------------------------------------- Piece 3: live view, usage guess, versions */
+.live { position: absolute; top: 66px; right: 18px; bottom: 96px; width: 340px; display: flex; flex-direction: column; z-index: 19;
+  background: var(--panel2); border: 1px solid rgba(var(--accent-rgb), .45); border-radius: 14px; box-shadow: 0 16px 44px rgba(0, 0, 0, .45); animation: tin .2s ease-out; }
+.live-open #feed { padding-right: 380px; }
+.live-open .btw { right: 372px; }
+.live-body { overflow-y: auto; padding: 10px 12px 14px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; }
+.live-empty { font-size: 12.5px; }
+.live-now { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.live-now.on { color: var(--accent2); font-weight: 600; }
+.live-step { background: var(--well); border-radius: 8px; padding: 7px 9px; overflow-wrap: anywhere; }
+.live-pic { margin: 0; border-radius: 10px; overflow: hidden; border: 1px solid var(--line2); cursor: zoom-in; }
+.live-pic img { width: 100%; display: block; }
+.live-pic figcaption { font-size: 11.5px; color: var(--faint); padding: 4px 8px; }
+.live-steps { display: flex; flex-direction: column; gap: 3px; }
+.ls { display: grid; grid-template-columns: 10px 1fr auto; gap: 8px; align-items: center; font-size: 12.5px; }
+.ls i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+.ls.bad i { background: var(--bad); } .ls.wait i { background: var(--warn); animation: pulse 1s infinite; }
+.live-files .mono { font-size: 11.5px; overflow-wrap: anywhere; }
+#live-toggle.on { border-color: var(--accent); color: var(--accent2); }
+.usage-guess { margin-top: 6px; font-size: 12.5px; color: var(--warn); background: rgba(227, 167, 47, .08); border: 1px solid rgba(227, 167, 47, .3); border-radius: 8px; padding: 5px 9px; }
+.tmv { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: var(--panel2); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; margin-bottom: 6px; }

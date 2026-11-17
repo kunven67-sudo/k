@@ -533,6 +533,33 @@ function start(port, ...extra) {
     await page.click("#set-versions");
     await page.waitForSelector("#drawer-body >> text=Its own versions", { timeout: 5000 });
     await page.click("#drawer-x");
+
+    // ---- Piece 3, part 5d: live view, schedule instead, time machine
+    await page.click("#nav [data-tab=chat]");
+    await page.click("#new-chat");
+    await page.click("#live-toggle");
+    await page.waitForSelector("#live .live-empty", { timeout: 3000 });
+    await page.fill("#msg", "tell me a story");
+    await page.keyboard.press("Enter");
+    await page.waitForSelector("#live .live-now.on", { timeout: 10000 });
+    await shot(page, "27-live-view.png");
+    await page.waitForSelector("#live .live-now:not(.on)", { timeout: 30000 });
+    await page.click("#live-x");
+    await page.click("#new-chat");
+    await page.fill("#msg", "make me a todo list file");
+    await page.keyboard.press("Enter");
+    await page.waitForSelector(".card >> text=Schedule it for later", { timeout: 20000 });
+    await page.click(".card >> text=Schedule it for later");
+    await page.waitForFunction(() => document.querySelector("#sj-text") && document.querySelector("#sj-text").value.startsWith("Build this"), null, { timeout: 8000 });
+    assert((await page.inputValue("#sj-mode")) === "build" && (await page.inputValue("#sj-when")) === "usage_reset", "prefilled as a build after the reset");
+    await page.click("#sj-cancel");
+    await page.click("#nav [data-tab=away]");
+    await page.click(".ptbl tr:has-text('games/street-racer') [data-pversions]");
+    await page.click("[data-tmsave]");
+    await page.waitForSelector(".tmv", { timeout: 5000 });
+    await page.click(".tmv [data-tmopen]");
+    await page.waitForSelector(".toast >> text=Opened a copy in", { timeout: 5000 });
+    await page.click("#drawer-x");
   } catch (e) {
     errors.push(String(e && e.stack || e));
   } finally {

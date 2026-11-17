@@ -4,6 +4,7 @@ The e2e tests use the REAL Claude Code CLI with a fake Claude ($0, no usage)."""
 from __future__ import annotations
 
 import io
+import zlib
 import zipfile
 from pathlib import Path
 
@@ -1010,4 +1011,220 @@ def test_e2e_propose_upgrade():
         assert "Talk a bit faster" in seen[-1] and "YOUR MOOD RIGHT NOW" in seen[-1]
         run_task(od, "upgrade yourself again", answer=lambda c: ("no", None, ""))
         assert len(od.feelings.upgrades) == 1                            # No = nothing added
+    with_fake(lambda r, f: [X("ok")], go)
+
+
+# ================================================================ Part 5d
+
+
+
+def _fake_assets():
+    """A fake ambientCG + Poly Haven + Openverse on 127.0.0.1 (tests never touch the internet)."""
+    import io as _io
+    import json as _json
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from .piece2_tests import png
+    tex = _io.BytesIO()
+    with zipfile.ZipFile(tex, "w") as z:
+        z.writestr("Asphalt001_1K_Color.jpg", b"\xff\xd8\xff\xe0fakejpg")
+        z.writestr("Asphalt001_1K_NormalGL.jpg", b"\xff\xd8\xff\xe0fakejpg2")
+        z.writestr("../../evil.txt", b"escape")
+
+    class H(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_GET(self):
+            base = f"http://127.0.0.1:{self.server.server_address[1]}"
+            path = self.path
+            body, ctype = b"", "application/json"
+            if path.startswith("/acg?type=Material"):
+                body = _json.dumps({"foundAssets": [{"assetId": "Asphalt001", "displayName": "Asphalt 001",
+                                                     "previewImage": {"256-PNG": base + "/thumb.png"}}]}).encode()
+            elif path.startswith("/acg?id=Asphalt001"):
+                body = _json.dumps({"foundAssets": [{"assetId": "Asphalt001", "downloadFolders": {"default": {
+                    "downloadFiletypeCategories": {"zip": {"downloads": [
+                        {"attribute": "1K-JPG", "downloadLink": base + "/tex.zip"},
+                        {"attribute": "4K-JPG", "downloadLink": base + "/big.zip"}]}}}}}]}).encode()
+            elif path.startswith("/ph/assets?t=models"):
+                body = _json.dumps({"ArmChair_01": {"name": "Arm Chair 01"}}).encode()
+            elif path.startswith("/ph/files/ArmChair_01"):
+                body = _json.dumps({"gltf": {"1k": {"gltf": {"url": base + "/chair.gltf", "include": {
+                    "textures/chair_diff_1k.jpg": {"url": base + "/chairtex.jpg"}, "../bad.jpg": {"url": base + "/chairtex.jpg"}}}}}}).encode()
+            elif path.startswith("/ov/?q="):
+                body = _json.dumps({"results": [{"id": "snd-1234567890abcdef", "title": "V8 idle", "license": "cc0", "creator": "Ann"}]}).encode()
+            elif path.startswith("/ov/snd-1234567890abcdef/"):
+                body = _json.dumps({"id": "snd-1234567890abcdef", "title": "V8 idle", "license": "cc0", "url": base + "/v8.mp3",
+                                    "filetype": "mp3", "creator": "Ann", "foreign_landing_url": "https://example.org/v8"}).encode()
+            elif path.startswith("/ov/snd-notcc0/"):
+                body = _json.dumps({"id": "snd-notcc0", "license": "by", "url": base + "/v8.mp3"}).encode()
+            elif path == "/thumb.png":
+                body, ctype = png(0, 0, 255), "image/png"
+            elif path == "/tex.zip":
+                body, ctype = tex.getvalue(), "application/zip"
+            elif path == "/chair.gltf":
+                body = b'{"asset": {"version": "2.0"}}'
+            elif path == "/chairtex.jpg":
+                body, ctype = b"\xff\xd8\xff\xe0chair", "image/jpeg"
+            elif path == "/v8.mp3":
+                body, ctype = b"ID3fakemp3", "audio/mpeg"
+            else:
+                self.send_response(404)
+                self.end_headers()
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv
+
+
+@covers(37, 41, title="Real assets: finds free CC0 textures, models and sounds, downloads them safely (fake library)")
+def test_assets_finder():
+    import asyncio
+    from .. import assets, pictures
+    from ..pictures import PictureStore
+    from ..store import Workspace
+    from ..tools import ToolContext
+    srv = _fake_assets()
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
+    old = dict(assets.ENDPOINTS)
+    old_ssl = pictures._ssl_context
+    assets.ENDPOINTS.update(ambientcg=base + "/acg", polyhaven=base + "/ph", openverse_audio=base + "/ov/")
+    try:
+        with TempDir() as tmp:
+            ws = Workspace(tmp / "ws", tmp / "versions")
+            ctx = ToolContext(workspace=ws, pictures=PictureStore(tmp / "pics"))
+
+            async def run():
+                r = await assets.h_find({"kind": "texture", "query": "asphalt"}, ctx)
+                assert not r.is_error and "Asphalt001" in r.text and r.data["pictures"], r.text
+                r = await assets.h_find({"kind": "model", "query": "chair"}, ctx)
+                assert "ArmChair_01" in r.text
+                r = await assets.h_find({"kind": "sound", "query": "v8"}, ctx)
+                assert "snd-1234567890abcdef" in r.text
+                g = await assets.h_get({"source": "ambientcg", "id": "Asphalt001", "dest": "games/racer/assets/asphalt"}, ctx)
+                assert not g.is_error and (tmp / "ws/games/racer/assets/asphalt/Asphalt001_1K_Color.jpg").is_file(), g.text
+                assert not (tmp / "ws/games/evil.txt").exists() and not (tmp / "evil.txt").exists()
+                g = await assets.h_get({"source": "polyhaven", "id": "ArmChair_01", "kind": "model", "dest": "games/racer/assets/chair"}, ctx)
+                assert (tmp / "ws/games/racer/assets/chair/textures/chair_diff_1k.jpg").is_file(), g.text
+                assert not (tmp / "ws/games/racer/assets/bad.jpg").exists()
+                g = await assets.h_get({"source": "openverse", "id": "snd-1234567890abcdef", "dest": "games/racer/sfx"}, ctx)
+                assert (tmp / "ws/games/racer/sfx/CREDITS.txt").is_file() and not g.is_error
+                g = await assets.h_get({"source": "openverse", "id": "snd-notcc0", "dest": "games/racer/sfx"}, ctx)
+                assert g.is_error and "CC0" in g.text
+            asyncio.run(run())
+    finally:
+        assets.ENDPOINTS.clear()
+        assets.ENDPOINTS.update(old)
+        pictures._ssl_context = old_ssl
+        srv.shutdown()
+
+
+@covers(27, 46, title="Rules check gives the human's rules + PC as a checklist; usage guess learns from real jobs")
+def test_rules_check_and_usage_guess():
+    import asyncio
+    from ..agent import Overdrive
+    from ..checks import UsageHistory
+    with TempDir() as tmp:
+        od = Overdrive(home=tmp / "home", test_env={"X": "1"})
+        od.memory.remember("instruction", "No emojis in games", "never put emojis in a game", provenance="test")
+        od.memory.remember("fact", "Likes realistic games", "real textures", provenance="test", tags=["pinned"])
+        od.settings.update({"pc_profile": "i5-6500, 16 GB RAM, GT 1030 2 GB"}, by="test")
+        spec = od.tools.get("rules_check")
+        r = asyncio.run(spec.handler({}, None))
+        assert "No emojis in games" in r.text and "Likes realistic games" in r.text and "GT 1030" in r.text and "NO-LAG" in r.text
+        uh = UsageHistory(tmp)
+        assert uh.guess("build") is None
+        for pct in (3.0, 5.0, 4.0, 30.0):
+            uh.add("build", "claude-opus-5-5", pct, 10)
+        g = uh.guess("build", "opus")
+        assert g["pct"] == 4.5 and g["high"] == 30.0 and g["n"] == 4, g
+        assert "4" in od._usage_guess_text("opus") or "No guess" in od._usage_guess_text("opus")
+
+
+@covers(92, 44, title="Time machine: keeps every version, opens an old copy next to the new one, goes back safely")
+def test_time_machine():
+    import time as _t
+    from ..projects import Projects
+    from ..timemachine import TimeMachine
+    with TempDir() as tmp:
+        ws = tmp / "ws"
+        (ws / "games" / "racer").mkdir(parents=True)
+        (ws / "games" / "racer" / "game.js").write_text("v1")
+        tm = TimeMachine(tmp / "home", Projects(ws, tmp))
+        v1 = tm.snapshot("games/racer", "first")
+        assert v1 and tm.snapshot("games/racer", "same again") is None                # nothing changed: no copy
+        _t.sleep(1.1)
+        (ws / "games" / "racer" / "game.js").write_text("v2 with night map")
+        (ws / "games" / "racer" / "night.js").write_text("night")
+        v2 = tm.snapshot("games/racer", "night map")
+        assert v2 and [v["id"] for v in tm.versions("games/racer")] == [v2["id"], v1["id"]]
+        copy = tm.open_copy("games/racer", v1["id"])
+        assert (ws / copy / "game.js").read_text() == "v1" and (ws / "games/racer/game.js").read_text().startswith("v2")
+        _t.sleep(1.1)
+        (ws / "games" / "racer" / "game.js").write_text("v3 unsaved work")
+        res = tm.go_back("games/racer", v1["id"])
+        assert (ws / "games/racer/game.js").read_text() == "v1" and not (ws / "games/racer/night.js").exists()
+        assert res["saved_first"] and len(tm.versions("games/racer")) == 3                  # v3 was saved first
+        for bad in ("../x", "20261117"):
+            try:
+                tm.go_back("games/racer", bad)
+                raise AssertionError("bad version id must fail")
+            except ValueError:
+                pass
+
+
+@covers(19, 93, title="Game eyes parts: real PNG screenshots, blank-screen check, key names; Windows only")
+def test_game_eyes_parts():
+    import asyncio
+    from ..gameeyes import IS_WIN, VK, looks_blank, make_game_eyes_tool, png_from_bgra
+    from ..pictures import sniff
+    w, h = 4, 3
+    px = bytes([10, 20, 30, 255] * (w * h))
+    data = png_from_bgra(w, h, px)
+    assert sniff(data) == "png" and data[16:24] == bytes([0, 0, 0, 4, 0, 0, 0, 3])
+    raw = zlib.decompress(data[data.index(b"IDAT") + 4:data.index(b"IEND") - 8])
+    assert raw[1:4] == bytes([30, 20, 10])                          # BGRA -> RGB
+    assert looks_blank(bytes([0, 0, 0, 255] * 5000)) and not looks_blank(bytes(range(256)) * 80)
+    assert VK["W"] == 0x57 and VK["SPACE"] == 0x20 and VK["F5"] == 0x74
+    if not IS_WIN:
+        spec = make_game_eyes_tool(None)
+        r = asyncio.run(spec.handler({"action": "look"}, None))
+        assert r.is_error and "Windows" in r.text
+
+
+@covers(37, cli=True, title="Pictures a tool makes (like a game screenshot) reach Claude as real images")
+def test_e2e_tool_images():
+    from ..permissions import Risk
+    from ..tools import ToolResult, ToolSpec
+    from .piece2_tests import png
+    got = {}
+
+    def go(tmp, fake):
+        od = make_agent(tmp, fake, mode="chat")
+
+        async def h(args, ctx):
+            return ToolResult(text="Screenshot attached.", images=[png(0, 255, 0)])
+        od.tools.add(ToolSpec(name="test_shot", title="Test screenshot", description="Returns a test screenshot picture.",
+                              schema={"type": "object", "properties": {}}, risk=Risk.READ, handler=h,
+                              limitations=["test only"]))
+
+        def script(req, f):
+            if not is_overdrive_main(req):
+                return [X("Shot")]
+            if turn_index(req) == 0:
+                return [T("test_shot")]
+            users = [m for m in req.get("messages", []) if m.get("role") == "user"]
+            got["last"] = users[-1].get("content")
+            return [X("I see a green picture.")]
+        fake.script = script
+        rec = run_task(od, "take a test shot")
+        assert rec.status == "done", rec.status_reason
+        blocks = json_text({"messages": [{"content": got["last"]}]})
+        assert '"image"' in blocks and "image/png" in blocks, blocks[:500]
     with_fake(lambda r, f: [X("ok")], go)

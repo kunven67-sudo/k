@@ -277,7 +277,8 @@ def test_e2e_only_overdrive_tools():
                                              "write_text_file", "task_plan", "task_report", "memory_remember",
                                              "memory_recall", "memory_list", "memory_update", "memory_archive",
                                              "start_build", "show_pictures", "schedule_job", "propose_upgrade",
-                                             "self_update", "self_update_check", "self_update_install")}
+                                             "self_update", "self_update_check", "self_update_install",
+                                             "find_assets", "get_asset", "rules_check", "game_eyes")}
 
     def names_for(mode):
         seen = {}

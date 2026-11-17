@@ -75,6 +75,7 @@ DEFAULTS: dict[str, Any] = {
     "accent": "#ff6a2b",
     "pictures_keep_days": 0,     # chat pictures: delete after N days (0 = keep forever)
     "pictures_max_mb": 1000,     # ...or when the folder gets bigger than this (oldest go first)
+    "pc_profile": "",            # "" = read the PC by itself; or type your PC (for the no-lag check)
 }
 
 _SCHEMA: dict[str, tuple] = {
@@ -124,6 +125,7 @@ _SCHEMA: dict[str, tuple] = {
     "accent": (str, lambda v: bool(__import__("re").fullmatch(r"#[0-9a-fA-F]{6}", v)), "Accent color"),
     "pictures_keep_days": (int, lambda v: v in (0, 7, 30, 90, 365), "Keep chat pictures"),
     "pictures_max_mb": (int, lambda v: 50 <= v <= 20000, "Picture folder limit"),
+    "pc_profile": (str, lambda v: len(v) <= 400, "Your PC"),
 }
 
 FONTS = ("default", "bahnschrift", "verdana", "georgia", "cascadia", "trebuchet")

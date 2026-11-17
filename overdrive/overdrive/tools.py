@@ -24,6 +24,7 @@ class ToolResult:
     source: str = ""                   # where untrusted content came from, e.g. "file:notes.txt"
     changes: list[dict] = field(default_factory=list)  # what this call changed (for undo + side-effect report)
     data: dict | None = None           # structured info for OVERDRIVE itself (not shown to Claude)
+    images: list[bytes] = field(default_factory=list)   # Piece 3: PNG pictures Claude gets to look at (game eyes)
 
 
 class ToolContext:
