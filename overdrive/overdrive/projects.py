@@ -47,7 +47,8 @@ def last_change(folder: Path) -> float:
     """Newest file time inside a project (stops after MAX_SCAN_FILES files)."""
     newest, n = 0.0, 0
     for p in folder.rglob("*"):
-        if any(part in SKIP_DIRS for part in p.parts):
+        # only the part INSIDE the project counts (a "Temp" or "Library" higher up in the path is fine)
+        if any(part in SKIP_DIRS for part in p.relative_to(folder).parts[:-1]):
             continue
         try:
             if p.is_file():

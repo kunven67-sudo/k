@@ -298,7 +298,7 @@ def file_sha(path: Path) -> str:
     h = hashlib.sha256()
     if path.is_dir():
         for p in sorted(path.rglob("*")):
-            if p.is_file() and p.suffix.lower() in TEXT_EXT and not any(x in SKIP_DIRS for x in p.parts):
+            if p.is_file() and p.suffix.lower() in TEXT_EXT and not any(x in SKIP_DIRS for x in p.relative_to(path).parts[:-1]):
                 h.update(p.relative_to(path).as_posix().encode())
                 h.update(p.read_bytes())
     else:

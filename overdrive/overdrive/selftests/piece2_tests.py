@@ -216,36 +216,39 @@ def test_chat_list_rename_delete_search():
     from ..agent import Overdrive
     with tempfile.TemporaryDirectory() as d:
         od = Overdrive(home=Path(d), test_env={"X": "1"})
-        a, b = od.new_conversation("Racing game ideas"), od.new_conversation("Shopping list")
-        rec = TaskRecord(id="t20261116-101010-abcd", conversation=b.id, request="what GPU fits my Dell OptiPlex?",
-                         final_text="The RTX 3050 6GB low profile fits.", status="done")
-        od.task_store.save(rec)
-        b.tasks.append(rec.id)
-        hits = od.search_conversations("optiplex")
-        assert [h["id"] for h in hits] == [b.id] and "OptiPlex" in hits[0]["snippet"]
-        assert [h["id"] for h in od.search_conversations("racing")] == [a.id]
-        assert [h["id"] for h in od.search_conversations("rtx 3050")] == [b.id]          # in the answer, both words
-        assert od.search_conversations("") == [] and od.search_conversations("zebra") == []
-        od.rename_conversation(a.id, "  Realistic   racing  ")
-        assert od.conversations[a.id].title == "Realistic racing"
-        for bad in ("", "   "):
+        try:
+            a, b = od.new_conversation("Racing game ideas"), od.new_conversation("Shopping list")
+            rec = TaskRecord(id="t20261116-101010-abcd", conversation=b.id, request="what GPU fits my Dell OptiPlex?",
+                             final_text="The RTX 3050 6GB low profile fits.", status="done")
+            od.task_store.save(rec)
+            b.tasks.append(rec.id)
+            hits = od.search_conversations("optiplex")
+            assert [h["id"] for h in hits] == [b.id] and "OptiPlex" in hits[0]["snippet"]
+            assert [h["id"] for h in od.search_conversations("racing")] == [a.id]
+            assert [h["id"] for h in od.search_conversations("rtx 3050")] == [b.id]          # in the answer, both words
+            assert od.search_conversations("") == [] and od.search_conversations("zebra") == []
+            od.rename_conversation(a.id, "  Realistic   racing  ")
+            assert od.conversations[a.id].title == "Realistic racing"
+            for bad in ("", "   "):
+                try:
+                    od.rename_conversation(a.id, bad)
+                    raise AssertionError("empty name allowed")
+                except ValueError:
+                    pass
+            res = od.delete_conversation(b.id)
+            assert res["tasks"] == 1 and b.id not in od.conversations and od.task_store.load(rec.id) is None
+            again = Overdrive(home=Path(d), test_env={"X": "1"})                   # stays deleted after a restart
+            assert b.id not in again.conversations and again.conversations[a.id].title == "Realistic racing"
+            kinds = [e["kind"] for e in again.audit.read()] if hasattr(again.audit, "read") else None
+            if kinds is not None:
+                assert "chat_deleted" in kinds and "chat_renamed" in kinds
             try:
-                od.rename_conversation(a.id, bad)
-                raise AssertionError("empty name allowed")
+                od.delete_conversation("nope")
+                raise AssertionError("deleted a chat that doesn't exist")
             except ValueError:
                 pass
-        res = od.delete_conversation(b.id)
-        assert res["tasks"] == 1 and b.id not in od.conversations and od.task_store.load(rec.id) is None
-        again = Overdrive(home=Path(d), test_env={"X": "1"})                   # stays deleted after a restart
-        assert b.id not in again.conversations and again.conversations[a.id].title == "Realistic racing"
-        kinds = [e["kind"] for e in again.audit.read()] if hasattr(again.audit, "read") else None
-        if kinds is not None:
-            assert "chat_deleted" in kinds and "chat_renamed" in kinds
-        try:
-            od.delete_conversation("nope")
-            raise AssertionError("deleted a chat that doesn't exist")
-        except ValueError:
-            pass
+        finally:
+            od.close()
 
 
 # ----------------------------------------------------------------------------- e2e (real Claude Code, fake Claude)

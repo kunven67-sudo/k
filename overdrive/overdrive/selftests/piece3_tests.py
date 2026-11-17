@@ -360,7 +360,8 @@ def test_projects_done():
             os.utime(p, (old, old))
         pr = Projects(ws, tmp)
         assert pr.auto_done("never", 14) == {"marked": [], "ask": []}
-        assert pr.auto_done("ask", 14)["ask"] == ["space-run"]
+        got = pr.auto_done("ask", 14)
+        assert got["ask"] == ["space-run"], (got, [(x["name"], x["changed_days"]) for x in pr.list()])
         assert pr.auto_done("ask", 14)["ask"] == []                 # asks only once
         assert pr.auto_done("always", 14)["marked"] == ["space-run"] and pr.is_done("space-run")
         pr.set_done("space-run", False)

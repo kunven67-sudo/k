@@ -244,6 +244,10 @@ class Overdrive:
     def busy(self) -> bool:
         return self.current is not None
 
+    def close(self) -> None:
+        """Let go of open files (the memory database). Windows can't delete a file that's still open."""
+        self.memory.close()
+
     def background_running(self) -> bool:
         return self.current is not None and self.current.rec.background
 
