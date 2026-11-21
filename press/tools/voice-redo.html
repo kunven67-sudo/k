@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PRESS Voice Redo</title>
+<style>
+:root { --bg: #101113; --panel: #17191c; --line: #2a2d32; --ink: #e9ebee; --dim: #8b9098; --red: #d72b22; --red2: #ff4a3d; --ok: #59c27a; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 "Segoe UI", system-ui, sans-serif; }
+header { padding: 28px max(16px, 4vw) 18px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 18px; align-items: end; justify-content: space-between; }
+h1 { margin: 0; font-size: 34px; letter-spacing: .18em; font-weight: 800; }
+h1 span { color: var(--red); }
+.sub { color: var(--dim); margin-top: 4px; }
+.tips { padding: 14px max(16px, 4vw); color: var(--dim); font-size: 14px; border-bottom: 1px solid var(--line); }
+.tips b { color: var(--ink); }
+main { padding: 18px max(16px, 4vw) 120px; display: grid; gap: 12px; max-width: 980px; }
+.line { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; grid-template-columns: 1fr auto; gap: 10px 16px; }
+.line.done { border-color: #2e4a38; }
+.where { font-size: 12px; letter-spacing: .14em; color: var(--dim); text-transform: uppercase; }
+.text { font-size: 19px; margin: 2px 0 4px; }
+.how { font-size: 13px; color: var(--dim); }
+.ctl { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+button { font: inherit; color: var(--ink); background: #22252a; border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+button:hover { background: #2a2e34; }
+button.rec { background: var(--red); border-color: var(--red); font-weight: 700; }
+button.rec.on { background: var(--red2); animation: pulse 1s infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(255,74,61,.25); } }
+button:disabled { opacity: .35; cursor: default; }
+.takes { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; }
+.take { font-size: 13px; padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line); background: #1d2024; cursor: pointer; }
+.take.pick { border-color: var(--ok); color: var(--ok); }
+.meter { grid-column: 1 / -1; height: 4px; background: #22252a; border-radius: 4px; overflow: hidden; display: none; }
+.meter i { display: block; height: 100%; width: 0; background: var(--red2); }
+.line.recording .meter { display: block; }
+.bar { position: fixed; left: 0; right: 0; bottom: 0; background: rgba(16,17,19,.96); border-top: 1px solid var(--line); padding: 14px max(16px, 4vw); display: flex; gap: 14px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.bar .count { color: var(--dim); }
+.bar button.save { background: var(--ok); border-color: var(--ok); color: #08130b; font-weight: 800; padding: 10px 22px; }
+#err { color: var(--red2); }
+</style>
+</head>
+<body>
+<header>
+  <div><h1><span>PRESS</span> VOICE REDO</h1><div class="sub">HOST's lines. Record each one, listen back, redo as many times as you want, pick your best take (green), then Save.</div></div>
+  <div id="err"></div>
+</header>
+<div class="tips">
+  <b>How to sound good:</b> sit close to the mic (a hand away), quiet room, no fan. HOST is <b>calm and polite</b> at first, like a hotel worker who's a little too nice. Talk <b>slower than normal</b>, leave little pauses at the "..." parts. Don't act scary early on, the creepy comes from him being too calm. Your voice gets changed into a robot voice after, so don't worry how your real voice sounds. Press <b>Record</b>, wait half a second, then talk.
+</div>
+<main id="list"></main>
+<div class="bar"><span class="count" id="count">0 of 0 recorded</span><button class="save" id="save">Save all (zip)</button></div>
+<script>
+const LINES = [
+  ['elevator', 'In the elevator', "Floor two. The other floors are... not for you. Not yet.", 'Calm, slow down on "not yet".'],
+  ['t4', 'Test 4 - start', "Test Four. You've worked hard. Rest... You've earned it.", 'Very warm, almost too nice. Pause before "you\'ve earned it".'],
+  ['t5', 'Test 5 - start', "Test Five. Some buttons are out of reach. I've given you something to help with that.", 'Helpful, proud of his gift.'],
+  ['t10', 'Test 10 - start', "Test Ten. Order matters too.", 'Short, calm.'],
+];
+const takes = {}, pick = {};
+let stream = null, rec = null, recId = null, chunks = [], meterRaf = 0;
+const $ = s => document.querySelector(s);
+function render() {
+  $('#list').innerHTML = LINES.map(([id, where, text, how]) => `
+    <div class="line ${pick[id] != null ? 'done' : ''} ${recId === id ? 'recording' : ''}" id="L_${id}">
+      <div><div class="where">${where}</div><div class="text">${text}</div><div class="how">${how}</div></div>
+      <div class="ctl">
+        <button class="rec ${recId === id ? 'on' : ''}" data-rec="${id}" ${recId && recId !== id ? 'disabled' : ''}>${recId === id ? 'Stop' : (takes[id]?.length ? 'Record again' : 'Record')}</button>
+        <button data-play="${id}" ${pick[id] == null ? 'disabled' : ''}>Play</button>
+      </div>
+      <div class="meter"><i id="M_${id}"></i></div>
+      <div class="takes">${(takes[id] || []).map((t, i) => `<span class="take ${pick[id] === i ? 'pick' : ''}" data-take="${id}:${i}">Take ${i + 1} · ${t.sec.toFixed(1)}s</span>`).join('')}</div>
+    </div>`).join('');
+  const n = LINES.filter(l => pick[l[0]] != null).length;
+  $('#count').textContent = `${n} of ${LINES.length} recorded`;
+}
+async function getMic() {
+  if (stream) return stream;
+  stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: false, channelCount: 1 } });
+  return stream;
+}
+async function startRec(id) {
+  try { await getMic(); } catch (e) { $('#err').textContent = 'Microphone blocked. Allow the mic for this page (lock icon next to the address) and try again.'; return; }
+  chunks = []; recId = id;
+  const type = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : '';
+  rec = new MediaRecorder(stream, type ? { mimeType: type, audioBitsPerSecond: 160000 } : undefined);
+  const t0 = performance.now();
+  rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+  rec.onstop = () => {
+    const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
+    (takes[id] = takes[id] || []).push({ blob, sec: (performance.now() - t0) / 1000 });
+    pick[id] = takes[id].length - 1; recId = null; cancelAnimationFrame(meterRaf); render(); play(id);
+  };
+  rec.start();
+  // level meter
+  const ac = new AudioContext(), an = ac.createAnalyser(); ac.createMediaStreamSource(stream).connect(an); const buf = new Uint8Array(an.fftSize);
+  const tick = () => { an.getByteTimeDomainData(buf); let p = 0; for (const v of buf) p = Math.max(p, Math.abs(v - 128)); const m = document.getElementById('M_' + id); if (m) m.style.width = Math.min(100, p / 1.28) + '%'; if (recId === id) meterRaf = requestAnimationFrame(tick); else ac.close(); };
+  render(); tick();
+}
+let player = null;
+function play(id) { if (pick[id] == null) return; player?.pause(); player = new Audio(URL.createObjectURL(takes[id][pick[id]].blob)); player.play(); }
+document.addEventListener('click', e => {
+  const r = e.target.closest('[data-rec]'), p = e.target.closest('[data-play]'), t = e.target.closest('[data-take]');
+  if (r) { const id = r.dataset.rec; if (recId === id) rec.stop(); else if (!recId) startRec(id); }
+  if (p) play(p.dataset.play);
+  if (t) { const [id, i] = t.dataset.take.split(':'); pick[id] = +i; render(); play(id); }
+});
+// tiny zip writer (no compression)
+const crcT = new Uint32Array(256).map((_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+const crc32 = u => { let c = 0xFFFFFFFF; for (const b of u) c = crcT[(c ^ b) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+async function zip(files) {
+  const parts = [], cen = []; let off = 0; const enc = new TextEncoder();
+  for (const f of files) {
+    const data = new Uint8Array(await f.blob.arrayBuffer()), name = enc.encode(f.name), crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30)); h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true);
+    parts.push(h.buffer, name, data);
+    const c = new DataView(new ArrayBuffer(46)); c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint32(16, crc, true); c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+    cen.push(c.buffer, name); off += 30 + name.length + data.length;
+  }
+  const size = cen.reduce((a, b) => a + (b.byteLength ?? b.length), 0);
+  const e = new DataView(new ArrayBuffer(22)); e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, size, true); e.setUint32(16, off, true);
+  return new Blob([...parts, ...cen, e.buffer], { type: 'application/zip' });
+}
+$('#save').onclick = async () => {
+  const files = LINES.filter(l => pick[l[0]] != null).map(([id]) => ({ name: `host_${id}.webm`, blob: takes[id][pick[id]].blob }));
+  if (!files.length) { $('#err').textContent = 'Record at least one line first.'; return; }
+  const z = await zip(files), a = document.createElement('a');
+  a.href = URL.createObjectURL(z); a.download = 'PRESS-host-redo.zip'; a.click();
+  $('#err').textContent = ''; $('#count').textContent += ' · saved PRESS-host-redo.zip (send it in the chat)';
+};
+render();
+</script>
+</body>
+</html>
