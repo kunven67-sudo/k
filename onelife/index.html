@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ONE LIFE</title>
+<style>
+@font-face { font-family: Inter; src: url(assets/fonts/inter.woff2) format('woff2'); font-weight: 100 900; }
+:root { --ink: #eef1f4; --dim: rgba(238,241,244,0.6); --line: rgba(238,241,244,0.18); --warn: #e8c35a; --bad: #e0573a; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #000; color: var(--ink); font-family: Inter, system-ui, sans-serif; user-select: none; }
+#view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+.layer { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .5s; }
+.layer.on { opacity: 1; }
+.layer.on .click, .layer.on button, .layer.on input, .layer.on select { pointer-events: auto; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+
+/* loading */
+#loading { position: fixed; inset: 0; z-index: 50; background: #000; display: grid; place-items: center; transition: opacity 1s; }
+#loading.gone { opacity: 0; pointer-events: none; }
+#loading .t { font-weight: 200; letter-spacing: .6em; font-size: 22px; text-indent: .6em; }
+#loading .b { width: 240px; height: 1px; background: var(--line); margin: 22px auto 0; } #loadbar { display: block; height: 1px; width: 0; background: var(--ink); transition: width .3s; }
+
+/* menu: the land behind, title low on the left */
+#menu { background: linear-gradient(90deg, rgba(0,0,0,.62), rgba(0,0,0,.15) 45%, rgba(0,0,0,0) 70%), linear-gradient(0deg, rgba(0,0,0,.55), rgba(0,0,0,0) 40%); }
+#menu .wrap { position: absolute; left: 7vw; bottom: 11vh; }
+#menu h1 { margin: 0; font-weight: 200; font-size: clamp(54px, 8vw, 118px); letter-spacing: .14em; line-height: 1; }
+#menu .sub { margin: 14px 0 46px; color: var(--dim); font-size: 15px; letter-spacing: .08em; }
+.items button { display: block; font-size: 20px; font-weight: 300; letter-spacing: .12em; padding: 9px 0; color: var(--dim); position: relative; transition: color .2s, padding .2s; text-transform: uppercase; }
+.items button:hover { color: var(--ink); padding-left: 22px; }
+.items button:hover::before { content: ''; position: absolute; left: 0; top: 50%; width: 12px; height: 1px; background: var(--ink); }
+#menu .foot { position: absolute; right: 4vw; bottom: 5vh; color: rgba(238,241,244,.35); font-size: 12px; letter-spacing: .1em; text-align: right; line-height: 1.7; }
+
+/* panels (settings / controls / pause) */
+.panel { position: absolute; left: 7vw; bottom: 11vh; width: min(460px, 86vw); }
+.panel h2 { font-weight: 200; letter-spacing: .14em; font-size: 34px; margin: 0 0 26px; text-transform: uppercase; }
+.panel label { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 14px; letter-spacing: .05em; }
+.panel input[type=range] { width: 200px; accent-color: #eef1f4; }
+.panel select { background: rgba(0,0,0,.4); color: var(--ink); border: 1px solid var(--line); padding: 6px 10px; font: inherit; }
+.panel .back { margin-top: 26px; }
+.dimbg { background: rgba(0,0,0,.6); }
+table.keys { border-collapse: collapse; font-size: 14px; } .keys td { padding: 7px 18px 7px 0; border-bottom: 1px solid var(--line); } .keys td:first-child { color: var(--dim); width: 140px; letter-spacing: .06em; }
+
+/* HUD */
+#vitals { position: absolute; left: 26px; top: 24px; width: 230px; }
+.label { font-size: 11px; letter-spacing: .2em; color: var(--dim); text-transform: uppercase; }
+.bar { height: 3px; background: rgba(255,255,255,.14); margin: 7px 0 6px; } .bar i { display: block; height: 100%; background: var(--ink); transition: width .2s; } .bar i.low { background: var(--bad); }
+#blood { font-size: 12px; color: var(--dim); }
+#figure { width: 74px; margin: 14px 0 0; filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
+#figure .p { transition: fill .3s; stroke: rgba(0,0,0,.35); stroke-width: 1; }
+#figure .broken { stroke: #fff; stroke-width: 2.4; stroke-dasharray: 3 2; }
+#figure .bleeding { animation: pulse 1s infinite; }
+@keyframes pulse { 50% { opacity: .55; } }
+#injuries { font-size: 12px; color: var(--bad); margin-top: 8px; min-height: 14px; }
+#suitbox { margin-top: 16px; } #suitbox .bar i { background: #8fd3ff; }
+#temp { font-size: 12px; color: var(--dim); } #temp.hot { color: var(--bad); }
+#flags { font-size: 11px; letter-spacing: .12em; color: var(--warn); margin-top: 8px; line-height: 1.6; }
+#sizebox { position: absolute; right: 30px; top: 22px; text-align: right; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+#size { font-size: 40px; font-weight: 200; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+#as { font-size: 13px; color: var(--dim); margin-top: 2px; max-width: 360px; margin-left: auto; }
+#speed { margin-top: 16px; opacity: 0; transition: opacity .3s; } #speed.on { opacity: 1; }
+#speedV { font-size: 30px; font-weight: 300; font-variant-numeric: tabular-nums; } #speedSub { font-size: 13px; color: var(--dim); }
+#realm { position: absolute; left: 50%; top: 26px; transform: translateX(-50%); font-size: 12px; letter-spacing: .3em; text-transform: uppercase; color: var(--dim); opacity: 0; transition: opacity .6s; text-align: center; }
+#realm.on { opacity: 1; }
+#msgs { position: absolute; left: 50%; bottom: 13vh; transform: translateX(-50%); width: min(720px, 90vw); text-align: center; }
+.msg { font-size: 17px; font-weight: 300; letter-spacing: .02em; padding: 6px 0; opacity: 0; transform: translateY(8px); transition: opacity .5s, transform .5s; text-shadow: 0 1px 8px rgba(0,0,0,.9); }
+.msg.in { opacity: 1; transform: none; }
+#keys { position: absolute; right: 30px; bottom: 26px; text-align: right; font-size: 12px; color: var(--dim); line-height: 1.85; letter-spacing: .04em; opacity: 0; transition: opacity 1s; }
+#keys.on { opacity: 1; } #keys b { color: var(--ink); font-weight: 600; display: inline-block; min-width: 54px; }
+#hud.hide-hud > * { opacity: 0; }
+
+/* death */
+#death { background: radial-gradient(ellipse at center, rgba(0,0,0,.35), rgba(0,0,0,.85)); }
+#death .wrap { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); text-align: center; width: min(760px, 92vw); }
+#death h2 { font-weight: 200; letter-spacing: .5em; text-indent: .5em; font-size: 42px; margin: 0; }
+#dCause { margin: 20px 0 34px; font-size: 18px; color: var(--dim); font-weight: 300; }
+#dStats { display: flex; justify-content: center; gap: 44px; margin-bottom: 42px; } #dStats b { display: block; font-weight: 300; font-size: 22px; } #dStats span { font-size: 11px; letter-spacing: .18em; color: var(--dim); text-transform: uppercase; }
+#death .items { display: inline-block; text-align: left; }
+
+/* suit bench */
+#bench .title { position: absolute; left: 30px; top: 24px; } #bench .title b { font-weight: 200; font-size: 26px; letter-spacing: .14em; } #bench .title div { color: var(--dim); font-size: 13px; margin-top: 6px; }
+#tools { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); display: flex; gap: 10px; }
+#tools button { width: 160px; text-align: left; padding: 10px 12px; border: 1px solid var(--line); background: rgba(10,12,14,.65); color: var(--dim); font-size: 14px; }
+#tools button b { display: inline-block; width: 22px; color: var(--ink); } #tools button small { display: block; font-size: 11px; margin-top: 3px; color: rgba(238,241,244,.4); }
+#tools button.on { border-color: var(--ink); color: var(--ink); background: rgba(40,44,50,.8); }
+#benchInfo { position: absolute; right: 30px; top: 26px; font-size: 18px; font-weight: 300; text-align: right; }
+#benchMsg { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); width: min(760px, 90vw); text-align: center; font-size: 16px; font-weight: 300; text-shadow: 0 1px 6px #000; }
+#benchMsg.flash { animation: fl .6s; } @keyframes fl { from { color: #fff; transform: translate(-50%, -4px); } }
+#bench .done { position: absolute; right: 30px; bottom: 30px; font-size: 13px; letter-spacing: .14em; color: var(--dim); text-transform: uppercase; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="loading"><div><div class="t">ONE LIFE</div><div class="b"><i id="loadbar"></i></div></div></div>
+
+<div id="menu" class="layer">
+  <div class="wrap">
+    <h1>ONE LIFE</h1>
+    <div class="sub">One body. No second chances.</div>
+    <div class="items">
+      <button data-act="begin">Begin</button>
+      <button data-open="controls">Controls</button>
+      <button data-open="settings">Settings</button>
+      <button data-act="quit">Quit</button>
+    </div>
+  </div>
+  <div class="foot">Piece 1 · the land<br>Real scans from Poly Haven (CC0)</div>
+</div>
+
+<div id="settings" class="layer dimbg"><div class="panel">
+  <h2>Settings</h2>
+  <label>Volume <input id="setVol" type="range" min="0" max="1" step="0.01"></label>
+  <label>Mouse speed <input id="setSens" type="range" min="0.2" max="3" step="0.05"></label>
+  <label>Graphics <select id="setQ"><option value="auto">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="ultra">Ultra</option></select></label>
+  <div class="items back"><button data-back>Back</button></div>
+</div></div>
+
+<div id="controls" class="layer dimbg"><div class="panel">
+  <h2>Controls</h2>
+  <table class="keys">
+    <tr><td>W A S D</td><td>Move</td></tr>
+    <tr><td>Shift</td><td>Run. With the speed suit on: hold it and keep getting faster</td></tr>
+    <tr><td>Space</td><td>Jump (float up when you're tiny)</td></tr>
+    <tr><td>Q / E</td><td>Shrink / grow (hold)</td></tr>
+    <tr><td>G</td><td>Speed suit on / off</td></tr>
+    <tr><td>Tab</td><td>Open your suit on the bench</td></tr>
+    <tr><td>Mouse</td><td>Look · wheel = camera distance</td></tr>
+    <tr><td>Esc</td><td>Pause</td></tr>
+  </table>
+  <div class="items back"><button data-back>Back</button></div>
+</div></div>
+
+<div id="hud" class="layer">
+  <div id="vitals">
+    <div class="label">Health</div>
+    <div class="bar"><i id="hpbar" style="width:100%"></i></div>
+    <div id="blood">Blood 100%</div>
+    <svg id="figure" viewBox="0 0 60 120">
+      <circle id="f_head" class="p" cx="30" cy="12" r="9"/>
+      <rect id="f_torso" class="p" x="19" y="24" width="22" height="38" rx="6"/>
+      <rect id="f_armR" class="p" x="8" y="26" width="9" height="36" rx="4.5"/>
+      <rect id="f_armL" class="p" x="43" y="26" width="9" height="36" rx="4.5"/>
+      <rect id="f_legR" class="p" x="19" y="64" width="10" height="50" rx="5"/>
+      <rect id="f_legL" class="p" x="31" y="64" width="10" height="50" rx="5"/>
+    </svg>
+    <div id="injuries"></div>
+    <div id="suitbox">
+      <div class="label">Suit power</div>
+      <div class="bar"><i id="power" style="width:100%"></i></div>
+      <div id="temp">Core 25°C</div>
+      <div id="flags"></div>
+    </div>
+  </div>
+  <div id="sizebox">
+    <div id="size">1.80 m</div>
+    <div id="as">a person</div>
+    <div id="speed"><div id="speedV"></div><div id="speedSub"></div></div>
+  </div>
+  <div id="realm"></div>
+  <div id="msgs"></div>
+  <div id="keys">
+    <div><b>WASD</b>move &nbsp; <b>Shift</b>run &nbsp; <b>Space</b>jump</div>
+    <div><b>Q / E</b>shrink / grow</div>
+    <div><b>G</b>speed suit &nbsp; <b>Tab</b>open your suit</div>
+  </div>
+</div>
+
+<div id="pause" class="layer dimbg"><div class="panel">
+  <h2>Paused</h2>
+  <div class="items">
+    <button data-act="resume">Resume</button>
+    <button data-open="controls">Controls</button>
+    <button data-open="settings">Settings</button>
+    <button data-act="menu">Main menu</button>
+  </div>
+</div></div>
+
+<div id="death" class="layer">
+  <div class="wrap">
+    <h2>YOU DIED</h2>
+    <div id="dCause"></div>
+    <div id="dStats"></div>
+    <div class="items"><button data-act="again">Live again (new land)</button><button data-act="menu">Main menu</button></div>
+  </div>
+</div>
+
+<div id="bench" class="layer">
+  <div class="title"><b>YOUR SUIT</b><div>Power module, opened up. Drag to turn it.</div></div>
+  <div id="benchInfo"></div>
+  <div id="benchMsg"></div>
+  <div id="tools"></div>
+  <button class="done" data-act="closeBench">Tab · put it back on</button>
+</div>
+
+<script type="module" src="game.js"></script>
+</body>
+</html>
