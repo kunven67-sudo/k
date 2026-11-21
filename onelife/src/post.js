@@ -45,7 +45,9 @@ void main(){
     float l = dot(col, vec3(0.299, 0.587, 0.114));
     vec2 px = 1.0 / uRes; float e = abs(dot(texture2D(tDiff, uv + vec2(px.x, 0)).rgb - texture2D(tDiff, uv - vec2(px.x, 0)).rgb, vec3(0.33))) + abs(dot(texture2D(tDiff, uv + vec2(0, px.y)).rgb - texture2D(tDiff, uv - vec2(0, px.y)).rgb, vec3(0.33)));
     float sem = pow(clamp(l * 1.25 + e * 2.2, 0.0, 1.0), 0.85) + (h(uv * uRes + uTime) - 0.5) * 0.07;
-    col = mix(col, vec3(sem), uElectron);
+    // false color, like scientists color real electron microscope pictures: shape from the electron image, color from what it is
+    vec3 hue = col / max(1e-3, max(col.r, max(col.g, col.b)));
+    col = mix(col, sem * mix(vec3(1.0), hue, 0.85) * 1.2, uElectron);
   }
   if (uBreak > 0.6) col = mix(col, 1.0 - col, smoothstep(0.6, 1.2, uBreak) * step(0.5, h(vec2(floor(uTime * 6.0)))));
   // heat haze glow (hypersonic air)

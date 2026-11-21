@@ -6,8 +6,11 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import { makeLand } from './land.js';
 import { Terrain } from './terrain.js';
 import { Scatter, variantsFrom, grainGeo, bacteriumGeo, coccusGeo, phageGeo } from './scatter.js';
-import { Body, Avatar, fallDamage, PARTS } from './player.js';
-import { Deep, REALMS, realmFor } from './deep.js';
+import { Body, Avatar, fallDamage, PARTS, PAINTS, PART_NAMES } from './player.js';
+import { Life, jiggle, sway } from './life.js';
+import { Ants } from './ants.js';
+import { Gore } from './gore.js';
+import { Deep, REALMS, realmFor, realmName } from './deep.js';
 import { Post } from './post.js';
 import { Audio } from './audio.js';
 import { SuitBench } from './suit.js';
@@ -18,6 +21,7 @@ const $ = s => document.querySelector(s);
 const store = { get(k, d) { try { const v = localStorage.getItem('onelife.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('onelife.' + k, JSON.stringify(v)); } catch (e) {} } };
 
 const TEST = location.search.includes('test');
+if (navigator.webdriver) HTMLCanvasElement.prototype.requestPointerLock = function () { return Promise.resolve(); }; // automated test browser: never grab the real mouse
 // ---------------- renderer ----------------
 const canvas = $('#view');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, logarithmicDepthBuffer: true, powerPreference: 'high-performance' });
@@ -42,7 +46,7 @@ const T = {
   grass: tex('aerial_grass_rock_diff'), grassN: tex('aerial_grass_rock_nor', false), dirt: tex('forest_ground_04_diff'), rock: tex('rocky_terrain_02_diff'), rockN: tex('rocky_terrain_02_nor', false),
   soil: tex('brown_mud_diff'), soilN: tex('brown_mud_nor', false), leaves: tex('brown_mud_leaves_01_diff'), sand: tex('coast_sand_01_diff'), mineral: tex('rock_boulder_cracked_diff'), mineralN: tex('rock_boulder_cracked_nor', false),
 };
-const names = ['boulder', 'rocks', 'stones', 'pebble', 'rock', 'grass', 'grassb', 'dandelion', 'fern', 'shrub', 'celandine', 'nettle', 'stump', 'log', 'bark', 'moss', 'suit'];
+const names = ['boulder', 'rocks', 'stones', 'pebble', 'rock', 'grass', 'grassb', 'dandelion', 'fern', 'shrub', 'celandine', 'nettle', 'stump', 'log', 'bark', 'moss', 'suit', 'ant', 'machine'];
 const [G, sky] = await Promise.all([Promise.all(names.map(loadG)).then(a => Object.fromEntries(names.map((n, i) => [n, a[i]]))), new RGBELoader(manager).loadAsync('assets/tex/sky.hdr')]);
 sky.mapping = THREE.EquirectangularReflectionMapping;
 scene.background = sky; scene.backgroundIntensity = 1;
@@ -70,12 +74,73 @@ let scatter = buildScatter(land);
 if (TEST) macro.traverse(o => { if (o.material?.map) o.material.map.anisotropy = 1; });
 const deep = new Deep(scene);
 const avatar = new Avatar(G.suit); scene.add(avatar.root);
+// the respawn machine: a real street power cabinet, rewired to print you a new body
+// the respawn machine: built for this game in Blender (tools/machine.py), real metal texture (Poly Haven CC0)
+const machine = G.machine.scene; macro.add(machine);
+const mtex = (n, srgb) => { const t = tl.load('assets/tex/metal_plate_' + n + '.jpg'); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1.5, 1.5); if (srgb) t.colorSpace = THREE.SRGBColorSpace; return t; };
+const MT = { map: mtex('diff', true), normalMap: mtex('nor'), roughnessMap: mtex('rough') };
+const MAT = {
+  metal: new THREE.MeshStandardMaterial({ ...MT, color: 0xa7b0b9, metalness: 0.6, roughness: 1 }),
+  dark: new THREE.MeshStandardMaterial({ ...MT, color: 0x4a5058, metalness: 0.6, roughness: 1 }),
+  floor: new THREE.MeshStandardMaterial({ ...MT, color: 0x30353a, metalness: 0.9, roughness: 0.8 }),
+  glass: new THREE.MeshStandardMaterial({ color: 0xd6ecff, transparent: true, opacity: 0.14, roughness: 0.04, metalness: 0.1, envMapIntensity: 2, depthWrite: false, side: THREE.DoubleSide }),
+  glow: new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }),
+  cable: new THREE.MeshStandardMaterial({ color: 0x0e0f10, roughness: 0.55, metalness: 0 }),
+};
+const scr = document.createElement('canvas'); scr.width = 512; scr.height = 340; const scrTex = new THREE.CanvasTexture(scr); scrTex.colorSpace = THREE.SRGBColorSpace;
+MAT.screen = new THREE.MeshBasicMaterial({ map: scrTex, toneMapped: false });
+function drawScreen(lives, state) {
+  const c = scr.getContext('2d'); c.fillStyle = '#04080a'; c.fillRect(0, 0, 512, 340);
+  const col = '#' + avatar.paintU.uGlow.value.getHexString(); c.fillStyle = col; c.font = '600 40px Inter, sans-serif'; c.fillText('RESPAWN', 32, 70);
+  c.font = '300 30px Inter, sans-serif'; c.fillStyle = '#cfd8dc'; c.fillText('Body #' + (lives + 1) + ' ' + state, 32, 140);
+  c.fillText('Last: life #' + lives, 32, 190); c.fillStyle = col; c.fillRect(32, 250, 448 * (state === 'ready' ? 1 : 0.5), 14); c.strokeStyle = '#2b3338'; c.strokeRect(32, 250, 448, 14);
+  scrTex.needsUpdate = true;
+}
+machine.traverse(o => {
+  if (!o.isMesh) return; const n = o.name;
+  o.material = n.startsWith('glass') ? MAT.glass : n.startsWith('glow') ? MAT.glow : n.startsWith('cable') ? MAT.cable : n.startsWith('screen') ? MAT.screen : n.startsWith('floor') ? MAT.floor : n.includes('dark') ? MAT.dark : MAT.metal;
+  o.castShadow = !n.startsWith('glass') && !n.startsWith('glow'); o.receiveShadow = true;
+});
+const MR = 1.0; // base radius (m)
+const life = new Life(macro, G.ant, bacteriumGeo, phageGeo, {
+  hit: (p, d, kind, cause, str, dir, spray) => { S.body.hurt(p, d, kind, cause); avatar.hit(str, dir); post.U.uFlash.value = Math.max(post.U.uFlash.value, 0.08); audio.hurt(); if (spray) audio.sizzle(); once('antbite', spray ? 'Formic acid. It burns straight through the suit fabric.' : 'An ant. Its jaws are bigger than your whole body at this size.', 5); },
+  squash: () => { audio.crack(); once('squash', 'You stepped on an ant.', 3); },
+  bump: (dir, s) => { const bh = BH(); S.V.x += dir.x * bh * 3 * s; S.V.z += dir.z * bh * 3 * s; avatar.hit(0.4 * s); once('bump', "Bacteria. They don't bite, but at this size they slam into you.", 4); },
+  infect: () => { if (!S.body.infected) { S.body.infected = 0.02; once('infect', 'Soil bacteria got into your open wound. You have an infection.', 6); } },
+  message: (t, id) => once(id, t, 5),
+});
+// blood + limbs that come off
+const gore = new Gore(macro);
+const _t1 = new THREE.Vector3(), _t2 = new THREE.Vector3();
+const toWorld = v => new THREE.Vector3(S.P.x + v.x * S.k, S.P.y + v.y * S.k, S.P.z + v.z * S.k);
+const STUMP = { armL: 'LeftShoulder', armR: 'RightShoulder', legL: 'Hips', legR: 'Hips', head: 'neck' };
+function partPoint(p) { const n = S.body.lost[p] ? STUMP[p] : { head: 'Head', torso: 'Spine02', armL: 'LeftForeArm', armR: 'RightForeArm', legL: 'LeftLeg', legR: 'RightLeg' }[p]; return toWorld(avatar.bonePos(n, _t1)); }
+function hitYou(p, d, kind, cause, str, dir, spray) {
+  S.body.hurt(p, d, kind, cause); avatar.hit(str, dir); post.U.uFlash.value = Math.max(post.U.uFlash.value, 0.08); audio.hurt(); if (spray) audio.sizzle();
+  if (kind === 'cut' && !S.deep) gore.spray(partPoint(p), new THREE.Vector3(Math.sin(dir), 0.5, Math.cos(dir)), 3 + Math.min(12, Math.floor(d / 3)), BH(), 1);
+}
+const onLose = part => {
+  const names = avatar.cut(part); if (!names) return;
+  const wp = gore.sever(avatar, names, S.P, S.k, S.O);
+  gore.spray(wp, new THREE.Vector3(0, 0.8, 0), 28, BH(), 1.5); gore.spray(partPoint(part), new THREE.Vector3(0, 0.6, 0), 20, BH(), 1.3);
+  audio.crack(); audio.hurt(); post.U.uFlash.value = 0.4;
+  ui.message(part === 'head' ? 'It took your head off.' : 'Your ' + PART_NAMES[part].toLowerCase() + ' is gone. The suit piece went with it.', 5);
+};
+// real ants (nests, trails, they only notice you up close)
+const ants = new Ants(macro, G.ant, land, seed, {
+  hit: hitYou, hold: () => { S.held = 0.3; },
+  squash: () => { audio.crack(); once('squash', 'You stepped on an ant.', 3); },
+  message: (t, id) => once(id, t, 6),
+  legPoint: (side, h, off) => { const a = avatar.bonePos(side === 'L' ? 'LeftFoot' : 'RightFoot', _t1), b = avatar.bonePos(side === 'L' ? 'LeftUpLeg' : 'RightUpLeg', _t2); a.lerp(b, Math.min(1, h * 2)); a.x += Math.cos(off) * 0.07; a.z += Math.sin(off) * 0.07; return toWorld(a); },
+});
 const bench = new SuitBench(renderer, audio);
 bench.scene.environment = scene.environment;
 
 function buildScatter(land) {
   const S = new Scatter(land, macro);
-  const V = n => variantsFrom(G[n], null, /grass|fern|celandine|nettle|dandelion|moss/.test(n));
+  const KIND = n => /stump|log|bark/.test(n) ? 'wood' : /grass|fern|celandine|nettle|dandelion|shrub/.test(n) ? 'plant' : n === 'moss' ? 'moss' : 'rock';
+  const V = n => variantsFrom(G[n], null, /grass|fern|celandine|nettle|dandelion|moss/.test(n)).map(v => { if (KIND(n) === 'plant' && !v.mat.userData.sway) { sway(v.mat); v.mat.userData.sway = 1; } return { ...v, kind: KIND(n) }; });
+const organic = (x, z) => land.cover(x, z)[0] < 0.3;
   const rockMat = new THREE.MeshStandardMaterial({ map: T.mineral, normalMap: T.mineralN, roughness: 0.9, color: 0xd8cfc2 });
   const sandMat = new THREE.MeshStandardMaterial({ map: T.sand, normalMap: T.mineralN, roughness: 0.85, color: 0xf0e2c8 });
   const grainGeos = [1, 2, 3, 4, 5].map(i => grainGeo(i, 2));
@@ -91,18 +156,23 @@ function buildScatter(land) {
   // stones, bark, moss
   S.add({ id: 4, variants: [...V('pebble'), ...V('stones'), ...V('bark'), ...V('moss')], cell: 0.6, prob: 0.5, sMin: 0.35, sMax: 1.1, rBH: 4, rMin: 0.4, rMax: 8, kMin: 1e-6, kMax: 10, collide: true, shadow: false, cap: 200 });
   // gravel (2-12 mm): scanned stones near you, simple ones further away
-  S.add({ id: 5, variants: grainGeos.map(g => ({ geo: g, mat: rockMat, size: new THREE.Vector3(1, 0.62, 1) })), cell: 0.02, prob: 0.5, unit: 0.008, sMin: 0.3, sMax: 1.5, rBH: 8, rMin: 0.02, rMax: 0.3, kMin: 1e-6, kMax: 0.04, collide: true, shadow: true, cap: 500, tilt: 3 });
+  S.add({ id: 5, variants: grainGeos.map(g => ({ geo: g, mat: rockMat, size: new THREE.Vector3(1, 0.62, 1) })), cell: 0.02, prob: 0.5, unit: 0.008, sMin: 0.3, sMax: 1.5, rBH: 8, rMin: 0.02, rMax: 0.3, kMin: 1e-6, kMax: 0.04, collide: true, shadow: true, cap: 500, tilt: 3, kind: 'grain', where: (x, z, r) => !organic(x, z) || r() < 0.3 });
+  // crumbs of soil (dark humus clumps, 0.5 - 3 mm): what meadow ground is made of
+  const crumbMat = new THREE.MeshStandardMaterial({ map: T.soil, normalMap: T.soilN, roughness: 0.95, color: 0x6b5442 });
+  S.add({ id: 12, variants: grainGeos.map(g => ({ geo: g, mat: crumbMat, size: new THREE.Vector3(1, 0.62, 1) })), cell: 0.0035, prob: 0.75, unit: 0.0016, sMin: 0.35, sMax: 1.4, rBH: 9, rMin: 0.004, rMax: 0.06, kMin: 1e-7, kMax: 0.01, collide: true, shadow: true, cap: 600, tilt: 3, kind: 'soil', where: (x, z) => organic(x, z) });
   // sand grains (0.1 - 1 mm)
-  S.add({ id: 6, variants: grainGeos.map(g => ({ geo: g, mat: sandMat, size: new THREE.Vector3(1, 0.62, 1) })), cell: 0.0012, prob: 0.6, unit: 0.0009, sMin: 0.25, sMax: 1.0, rBH: 10, rMin: 0.004, rMax: 0.03, kMin: 2e-7, kMax: 0.002, collide: true, shadow: true, cap: 700, tilt: 3 });
+  S.add({ id: 6, variants: grainGeos.map(g => ({ geo: g, mat: sandMat, size: new THREE.Vector3(1, 0.62, 1) })), cell: 0.0012, prob: 0.6, unit: 0.0009, sMin: 0.25, sMax: 1.0, rBH: 10, rMin: 0.004, rMax: 0.03, kMin: 2e-7, kMax: 0.002, collide: true, shadow: true, cap: 700, tilt: 3, kind: 'grain', where: (x, z, r) => !organic(x, z) || r() < 0.2 });
   // silt + clay (4 - 60 um)
-  S.add({ id: 7, variants: grainGeos.map(g => ({ geo: g, mat: rockMat, size: new THREE.Vector3(1, 0.62, 1) })), cell: 5e-5, prob: 0.55, unit: 4.5e-5, sMin: 0.1, sMax: 1, rBH: 10, rMin: 2e-4, rMax: 0.002, kMin: 1e-8, kMax: 2e-4, collide: true, shadow: true, cap: 700, tilt: 3 });
+  S.add({ id: 7, variants: grainGeos.map(g => ({ geo: g, mat: rockMat, size: new THREE.Vector3(1, 0.62, 1) })), cell: 5e-5, prob: 0.55, unit: 4.5e-5, sMin: 0.1, sMax: 1, rBH: 10, rMin: 2e-4, rMax: 0.002, kMin: 1e-8, kMax: 2e-4, collide: true, shadow: true, cap: 700, tilt: 3, kind: 'grain' });
   // bacteria (1 - 4 um): rods with flagella + round clusters
   const bm = new THREE.MeshStandardMaterial({ color: 0xb9c79a, roughness: 0.38, metalness: 0 });
   const bm2 = new THREE.MeshStandardMaterial({ color: 0xd8c39b, roughness: 0.4 });
-  S.add({ id: 8, variants: [1, 2, 3, 4].map(i => ({ geo: bacteriumGeo(i, i % 2 === 0), mat: bm, size: new THREE.Vector3(3, 0.8, 0.8) })).concat([5, 6].map(i => ({ geo: coccusGeo(i), mat: bm2, size: new THREE.Vector3(2, 1, 2) }))), cell: 7e-6, prob: 0.45, unit: 1e-6, sMin: 0.7, sMax: 1.3, rBH: 14, rMin: 2e-5, rMax: 1.5e-4, kMin: 1e-8, kMax: 3e-5, collide: true, shadow: true, cap: 500, sink: 0.15 });
+  S.add({ id: 8, variants: [1, 2, 3, 4].map(i => ({ geo: bacteriumGeo(i, i % 2 === 0), mat: bm, size: new THREE.Vector3(3, 0.8, 0.8) })).concat([5, 6].map(i => ({ geo: coccusGeo(i), mat: bm2, size: new THREE.Vector3(2, 1, 2) }))), cell: 7e-6, prob: 0.45, unit: 1e-6, sMin: 0.7, sMax: 1.3, rBH: 14, rMin: 2e-5, rMax: 1.5e-4, kMin: 1e-8, kMax: 3e-5, collide: true, shadow: true, cap: 500, sink: 0.15, kind: 'bacterium', where: (x, z, r) => organic(x, z) || r() < 0.3 });
   // viruses (bacteriophages, ~0.2 um)
   const vm = new THREE.MeshStandardMaterial({ color: 0xc9ccd2, roughness: 0.3, metalness: 0.2 });
-  S.add({ id: 9, variants: [{ geo: phageGeo(), mat: vm, size: new THREE.Vector3(1.7, 2, 1.7) }], cell: 5e-7, prob: 0.4, unit: 1e-7, sMin: 0.9, sMax: 1.15, rBH: 14, rMin: 1e-6, rMax: 1e-5, kMin: 1e-8, kMax: 2e-6, collide: true, shadow: true, cap: 1200 });
+  S.add({ id: 9, variants: [{ geo: phageGeo(), mat: vm, size: new THREE.Vector3(1.7, 2, 1.7) }], cell: 5e-7, prob: 0.4, unit: 1e-7, sMin: 0.9, sMax: 1.15, rBH: 14, rMin: 1e-6, rMax: 1e-5, kMin: 1e-8, kMax: 2e-6, collide: true, shadow: true, cap: 1200, kind: 'virus' });
+  // everything small shakes from molecules hitting it; bacteria wobble + whip their flagella
+  jiggle(rockMat, 0.012); jiggle(sandMat, 0.012); jiggle(crumbMat, 0.008); jiggle(bm, 0.06, true); jiggle(bm2, 0.05); jiggle(vm, 0.08);
   return S;
 }
 
@@ -113,7 +183,7 @@ const S = {
   body: new Body(), yaw: 0, camYaw: 0, camPitch: 0.25, camDist: 4.6, facing: 0, seen: new Set(), stats: null, t: 0, msgT: 0,
   boomed: false, sizing: 0, fallBH: 0, jolt: 0,
 };
-const suit = bench.state; // what's inside your suit (changed in the suit bench)
+const suit = bench.state; S.body.onLose = onLose; // what's inside your suit (changed in the suit bench)
 bench.hooks = { hurt: (p, d, kind, c) => S.body.hurt(p, d, kind, c), heart: () => { S.body.heartStop = 6; } };
 const BH = () => 1.8 * S.k;
 
@@ -124,10 +194,16 @@ function newLife(newSeed) {
   let best = null;
   for (let i = 0; i < 60; i++) { const x = (i % 8) * 37 - 130, z = Math.floor(i / 8) * 41 - 140; const c = land.cover(x, z); const h = land.height(x, z, 1); const s = Math.abs(land.height(x + 2, z, 1) - h) + Math.abs(land.height(x, z + 2, 1) - h); const score = s + c[0] * 4; if (!best || score < best.s) best = { x, z, s: score }; }
   Object.assign(S, { P: { x: best.x, y: land.height(best.x, best.z, 0.1), z: best.z }, V: { x: 0, z: 0 }, vyBH: 0, onGround: true, logK: 0, k: 1, mult: 1, speedOn: false, power: 100, heat: 0, coreTemp: 25, realm: -1, boomed: false, sizing: 0, fallBH: 0 });
-  S.peakY = S.P.y; S.body.reset(); S.seen.clear(); bench.reset();
+  S.peakY = S.P.y; S.body.reset(); S.seen.clear(); bench.reset(); S.lives = 1; avatar.resetCuts(); if (newSeed) gore.clear();
+  placeMachine(best.x + 1.6, best.z - 1.4);
   S.stats = { smallest: 1, fastest: 0, dist: 0, t0: performance.now() };
   rebase(); deep.group.visible = false; deep.lights.visible = false; macro.visible = true;
   ui.clearMessages();
+}
+function placeMachine(x, z) {
+  // sit it flat on the lowest corner so it never floats
+  let y = Infinity; for (let i = 0; i < 8; i++) y = Math.min(y, land.height(x + Math.cos(i * 0.785) * MR * 1.1, z + Math.sin(i * 0.785) * MR * 1.1, 0.1));
+  S.spawn = { mx: x, mz: z, my: y - 0.03, x: x, z: z }; // you wake up standing in the tube
 }
 function rebase() {
   S.O = { x: S.P.x, y: S.P.y, z: S.P.z };
@@ -145,7 +221,9 @@ addEventListener('keydown', e => {
     if (k === 'Escape') pause(true);
     else if (k === 'Tab') openBench();
     else if (k === 'KeyG') toggleSpeed();
-  } else if (S.mode === 'mod') { if (k === 'Tab' || k === 'Escape') closeBench(); else bench.key(k); }
+    else if (k === 'KeyF' && !S.deep) { const r = ants.kick({ P: S.P, k: S.k }, S.facing); avatar.hit(0.5, S.facing + Math.PI); if (r) { audio.crack(); ui.message(r === 'killed' ? 'You kicked the ant. It is not getting up.' : 'You kicked the ant away. It backs off for a bit.', 3); } }
+    else if (k === 'KeyR') { const n = audio.radioNext(); if (n) ui.message('Radio: ' + n + (audio.song && audio.station >= 0 ? ' - ' + audio.song : ''), 3); }
+  } else if (S.mode === 'mod') { if (k === 'Tab' || k === 'Escape') closeBench(); else if (k === 'KeyP') repaint(); else bench.key(k); }
   else if (S.mode === 'pause' && k === 'Escape') pause(false);
 });
 addEventListener('keyup', e => keys.delete(e.code));
@@ -160,21 +238,26 @@ function toggleSpeed() {
   if (S.deep) { ui.message('The speed suit needs solid ground. You are floating.'); return; }
   S.speedOn = !S.speedOn; audio.click(); ui.message(S.speedOn ? 'Speed suit ON. Hold Shift and keep holding.' : 'Speed suit off.', 2);
 }
+function repaint() { const i = ((avatar.paintI ?? 0) + 1) % PAINTS.length; avatar.setPaint(i); store.set('paint', i); audio.click(); const m = document.querySelector('#benchMsg'); if (m) m.textContent = 'Paint: ' + PAINTS[i].name + '  (P = next color)'; }
 function openBench() { S.mode = 'mod'; document.exitPointerLock?.(); bench.open(); ui.show('bench'); }
 function closeBench() { bench.close(); S.mode = 'play'; ui.show('hud'); canvas.requestPointerLock?.(); }
-function pause(on) { S.mode = on ? 'pause' : 'play'; ui.show(on ? 'pause' : 'hud'); if (on) document.exitPointerLock?.(); else canvas.requestPointerLock?.(); }
-ui.on('begin', () => { audio.start(); newLife(false); S.mode = 'play'; ui.show('hud'); canvas.requestPointerLock?.(); ui.controlsHint(); });
+function pause(on) { if (on) save(); S.mode = on ? 'pause' : 'play'; ui.show(on ? 'pause' : 'hud'); if (on) document.exitPointerLock?.(); else canvas.requestPointerLock?.(); }
+async function startAudio() { audio.start(); if (!audio.real) { await audio.loadReal(); let st = []; try { st = await (await fetch('assets/sound/radio/stations.json')).json(); } catch (e) {} audio.initRadio(st); } }
+ui.on('continue', () => { startAudio(); if (!loadSave()) newLife(false); S.mode = 'play'; ui.show('hud'); canvas.requestPointerLock?.(); });
+ui.on('respawn', () => respawn());
+ui.on('begin', () => { startAudio(); store.set('save', null); newLife(true); S.mode = 'play'; ui.show('hud'); canvas.requestPointerLock?.(); ui.controlsHint(); });
 ui.on('resume', () => pause(false));
-ui.on('again', () => { newLife(true); S.mode = 'play'; ui.show('hud'); canvas.requestPointerLock?.(); });
+ui.on('again', () => { store.set('save', null); newLife(true); S.mode = 'play'; ui.show('hud'); canvas.requestPointerLock?.(); });
 ui.on('menu', () => { S.mode = 'menu'; ui.show('menu'); document.exitPointerLock?.(); });
 ui.on('settings', v => { Object.assign(settings, v); store.set('settings', settings); audio.volume = settings.vol; quality.mode = settings.quality; applyQuality(); });
-ui.on('quit', () => { fetch('/quit').catch(() => {}); setTimeout(() => window.close(), 200); });
+ui.on('quit', () => { save(); fetch('/quit').catch(() => {}); setTimeout(() => window.close(), 200); });
 ui.on('closeBench', () => closeBench());
 ui.initSettings(settings);
 
 // ---------------- helpers ----------------
 function groundAt(x, z, k = S.k) {
   const t = land.height(x, z, 1.8 * k / 17);
+  if (S.spawn && Math.hypot(x - S.spawn.mx, z - S.spawn.mz) < MR) return { y: S.spawn.my + 0.31, kind: 'metal', prop: true };
   const s = scatter.topAt(x, z);
   return s.top > t ? { y: s.top, kind: s.kind, prop: true } : { y: t, kind: 'ground', prop: false };
 }
@@ -183,10 +266,11 @@ function once(id, text, dur = 5) { if (S.seen.has(id)) return; S.seen.add(id); u
 
 // ---------------- quality (keeps it smooth on its own) ----------------
 const quality = { mode: TEST ? 'low' : settings.quality, level: 2, acc: 0, n: 0, cool: 0 };
-const QL = [{ pr: 0.6, shadow: 1024, grass: 0.55 }, { pr: 0.8, shadow: 1024, grass: 0.8 }, { pr: 1, shadow: 2048, grass: 1 }, { pr: 1.25, shadow: 2048, grass: 1.15 }, { pr: 1.6, shadow: 4096, grass: 1.3 }];
+// never draw below the real screen size (that was the "pixel" look): low quality cuts shadows + grass instead
+const QL = [{ pr: 1, shadow: 512, grass: 0.5 }, { pr: 1, shadow: 1024, grass: 0.75 }, { pr: 1, shadow: 2048, grass: 1 }, { pr: 1.25, shadow: 2048, grass: 1.15 }, { pr: 1.6, shadow: 4096, grass: 1.3 }];
 function applyQuality() {
   const lvl = quality.mode === 'auto' ? quality.level : { low: 0, medium: 1, high: 2, ultra: 4 }[quality.mode] ?? 2; quality.cur = lvl;
-  const q = QL[lvl]; renderer.setPixelRatio(Math.min(devicePixelRatio || 1, q.pr));
+  const q = QL[lvl]; renderer.setPixelRatio(Math.min(2, (devicePixelRatio || 1) * q.pr)); // real screen pixels (Windows 125%/150% scaling too)
   if (sun.shadow.mapSize.x !== q.shadow) { sun.shadow.mapSize.set(q.shadow, q.shadow); sun.shadow.map?.dispose(); sun.shadow.map = null; }
   const g = scatter.classes.find(c => c.id === 3); if (g) { g.rBH = 11 * q.grass; g.rMax = 20 * q.grass; g.last = null; }
   resize();
@@ -205,7 +289,7 @@ applyQuality();
 // ---------------- simulation ----------------
 let stepAcc = 0;
 function simulate(dt) {
-  const body = S.body, legs = body.legs, alive = !body.dead;
+  const body = S.body, legs = body.legs, alive = !body.dead; S.held = Math.max(0, (S.held || 0) - dt);
   // ---- size ----
   const wantShrink = alive && keys.has('KeyQ'), wantGrow = alive && keys.has('KeyE');
   S.sizing = 0;
@@ -237,7 +321,8 @@ function simulate(dt) {
   S.deep = k < 1e-7;
   if (S.deep) {
     const ri = realmFor(k);
-    if (ri !== S.realm) { S.realm = ri; S.q = { x: 0, y: 0, z: 0 }; const R = deep.enter(ri, seed, new THREE.Vector3(-Math.sin(S.camYaw), 0, -Math.cos(S.camYaw))); ui.message(R.name, 4); realmLines(ri); post.U.uFlash.value = 0.25; }
+    if (!S.deepMat) S.deepMat = /grain|rock|metal|rockground/.test(S.under || '') ? 'quartz' : 'life';
+    if (ri !== S.realm) { S.realm = ri; S.q = { x: 0, y: 0, z: 0 }; deep.enter(ri, seed, new THREE.Vector3(-Math.sin(S.camYaw), 0, -Math.cos(S.camYaw)), S.deepMat); ui.message(realmName(ri, S.deepMat), 4); realmLines(ri); post.U.uFlash.value = 0.25; if (ri === 6) audio.tear(); }
     if (!wasDeep) { macro.visible = false; deep.group.visible = true; deep.lights.visible = true; sun.visible = false; hemi.visible = false; S.speedOn = false; S.mult = 1; }
     const fwd = new THREE.Vector3(-Math.sin(S.camYaw) * Math.cos(S.camPitch), -Math.sin(S.camPitch), -Math.cos(S.camYaw) * Math.cos(S.camPitch));
     const right = new THREE.Vector3(Math.cos(S.camYaw), 0, -Math.sin(S.camYaw));
@@ -254,8 +339,11 @@ function simulate(dt) {
     const R = REALMS[S.realm];
     deepBg.set(R.bg); scene.background = deepBg; deepFog.color.set(R.bg); deepFog.density = R.fog; scene.fog = deepFog;
   } else {
+    S.deepMat = null;
     if (wasDeep) { macro.visible = true; deep.group.visible = false; deep.lights.visible = false; sun.visible = true; hemi.visible = true; S.realm = -1; scene.background = sky; S.P.y = groundAt(S.P.x, S.P.z).y; S.vyBH = 0; S.onGround = true; rebase(); }
     landPhysics(dt, alive, legs);
+    // remember what's right under you (that's what you shrink into)
+    const gu = groundAt(S.P.x, S.P.z); S.under = gu.prop ? gu.kind : land.cover(S.P.x, S.P.z)[0] > 0.3 ? 'rockground' : 'soilground';
   }
   body.update(dt);
   if (body.dead && S.mode === 'play') die();
@@ -276,7 +364,7 @@ function landPhysics(dt, alive, legs) {
     S.power -= dt * (0.4 + Math.log10(S.mult) * 0.25) * (suit.oc ? 1.5 : 1);
     if (S.power <= 0) ui.message('Battery empty. The speed suit cuts out.', 3);
   } else S.mult = 1 + (S.mult - 1) * Math.exp(-dt * (S.mult > 50 ? 2.5 : 4));
-  let target = (shift && legs === 0 ? 3.0 : 0.8) * (legs === 1 ? 0.45 : legs === 2 ? 0.15 : 1); // body heights per second
+  let target = (shift && legs === 0 ? 3.0 : 0.8) * (legs === 1 ? 0.45 : legs === 2 ? 0.15 : 1) * (S.held > 0 ? 0.3 : 1); // body heights per second (an ant holding on slows you)
   if (S.mult > 1.01) target = 3.0 * S.mult;
   const vReal = target * bh; // m/s
   if (il > 0) {
@@ -302,7 +390,10 @@ function landPhysics(dt, alive, legs) {
       if (hitBH > 4) { const d = (hitBH - 4) * 7; const what = g1.kind === 'rock' ? 'a rock' : 'something'; body.hurt('torso', d, 'blunt', `Ran into ${what} at ${fmtSpeed(sp)}`); body.hurt('head', d * 0.6, 'blunt', `Ran into ${what} at ${fmtSpeed(sp)}`); audio.crack(); S.mult = 1; post.U.uFlash.value = 0.3; }
       const gx = groundAt(nx, S.P.z), gz = groundAt(S.P.x, nz);
       if (gx.y - S.P.y <= step) { S.P.x = nx; g1 = gx; S.V.z *= 0.3; } else if (gz.y - S.P.y <= step) { S.P.z = nz; g1 = gz; S.V.x *= 0.3; } else { S.V.x = S.V.z = 0; g1 = groundAt(S.P.x, S.P.z); break; }
-    } else { S.P.x = nx; S.P.z = nz; }
+    } else {
+      if (plow && S.t - (S.phaseT || 0) > 0.2 && scatter.topAt(nx, nz).top > S.P.y + 0.3 * bh) { S.phaseT = S.t; post.U.uGlitch.value = 0.9; audio.play('meteor', { rate: 2.2, vol: 0.35, dur: 0.25 }); once('phase', 'You went straight through it. At this speed you phase through solid things.', 5); }
+      S.P.x = nx; S.P.z = nz;
+    }
     if (S.onGround && (fast || g1.y >= S.P.y - 0.12 * bh)) S.P.y = g1.y;
   }
   S.stats.dist += speed * dt; S.stats.fastest = Math.max(S.stats.fastest, speed);
@@ -310,21 +401,32 @@ function landPhysics(dt, alive, legs) {
   const g = g1.y;
   if (S.onGround) {
     if (alive && keys.has('Space') && legs === 0) { S.vyBH = suit.mass && k < 0.5 ? 4.4 : 2.15; S.onGround = false; S.peakY = S.P.y; }
-    else if (!fast && g < S.P.y - 0.12 * bh) { S.onGround = false; S.vyBH = 0; S.peakY = S.P.y; }
+    else if (!fast && !S.sizing && g < S.P.y - 0.12 * bh) { S.onGround = false; S.vyBH = 0; S.peakY = S.P.y; }
     else { S.P.y = g; S.vyBH = 0; }
   }
+  // wind: gusts that turn slowly; rising warm air (thermals) in the afternoon sun. Weaker near the ground and inside grass.
+  const W = S.wind || (S.wind = { x: 0, z: 0, up: 0 }), tt = S.t, wdir = Math.sin(tt * 0.05) * 2 + (seed % 7);
+  const wsp = Math.max(0, 2.6 + Math.sin(tt * 0.31) * 1.4 + Math.sin(tt * 1.7) * 0.7);
+  W.x = Math.cos(wdir) * wsp; W.z = Math.sin(wdir) * wsp; W.up = 0.3 + Math.sin(tt * 0.13) * 0.45 + Math.sin(tt * 0.9) * 0.2;
   if (!S.onGround) {
-    S.vyBH -= 5.4 * dt;
-    // terminal speed: tiny things fall slowly (the air holds you up). Unless you kept your full mass.
-    const cap = suit.mass ? 30 : 3 + 27 * Math.pow(smooth(0.05, 1, k), 2);
-    if (S.vyBH < -cap) S.vyBH += (-cap - S.vyBH) * Math.min(1, dt * 6);
-    S.P.y += S.vyBH * bh * dt; S.peakY = Math.max(S.peakY, S.P.y);
-    S.fallBH = Math.max(0, -S.vyBH);
+    const hAbove = S.P.y - g, wf = Math.min(1, Math.max(0.12, hAbove / 1.5));
+    // terminal speed: a person ~55 m/s, a mouse ~13, an ant ~2, dust almost floats. Full mass = you drop like a stone.
+    const vt = suit.mass ? 60 : Math.max(0.01, 55 * Math.sqrt(k)), tau = vt / 9.8;
+    const up = suit.mass ? 0 : (hAbove < 1500 ? W.up * wf : -0.2);
+    let vy = S.vyBH * bh;
+    if (tau < dt * 0.5) vy = Math.max(vy - 9.8 * dt, up - vt); // tiny: the air holds you, you ride it
+    else { const n = Math.min(20, Math.ceil(dt / (tau * 0.25))), h = dt / n; for (let i = 0; i < n; i++) { const vr = vy - up; vy += (-9.8 - 9.8 * vr * Math.abs(vr) / (vt * vt)) * h; } }
+    // the wind takes you sideways (instantly when you're tiny, barely when you're full size)
+    const wa = Math.min(1, dt / Math.max(tau, 1e-3)); S.V.x += (W.x * wf - S.V.x) * wa; S.V.z += (W.z * wf - S.V.z) * wa;
+    S.P.y += vy * dt; S.peakY = Math.max(S.peakY, S.P.y);
+    S.vyBH = vy / bh; S.fallBH = Math.max(0, -S.vyBH);
+    if (hAbove > 3 * bh && k < 0.02) once('wind', 'The wind has you. At this size the air is thick like water. Grow (E) to drop.', 6);
     if (S.P.y <= g) {
-      const fell = (S.peakY - g) / bh;
+      const vImp = Math.max(0, -vy);
       S.P.y = g; S.onGround = true; S.vyBH = 0; S.fallBH = 0;
-      if (fell > 2.2) { const sev = fallDamage(body, fell, g1.kind === 'rock' ? 'rock' : null); audio.land(sev); if (sev > 2) audio.crack(); audio.hurt(); post.U.uFlash.value = Math.min(0.5, sev * 0.06); ui.message(`You fell ${fell.toFixed(1)} body heights.`, 3); }
-      else if (fell > 0.6) audio.land(0.3);
+      // what hurts is how hard you hit, not how far you fell (tiny things hit the ground slowly and walk away)
+      if (vImp > 7) { const sev = fallDamage(body, 2.2 + (vImp - 7) / 1.7, g1.kind === 'rock' ? 'rock' : null, `Hit the ground at ${vImp.toFixed(1)} m/s`); audio.land(sev); if (sev > 2) audio.crack(); audio.hurt(); post.U.uFlash.value = Math.min(0.5, sev * 0.06); ui.message(`You hit the ground at ${(vImp * 3.6).toFixed(0)} km/h.`, 3); }
+      else if (vImp > 2 * bh) audio.land(0.3);
     }
   }
   S.inAir = !S.onGround; S.speedBH = speed / bh;
@@ -352,15 +454,17 @@ function sizeLines() {
   if (k < 0.12) once('s1', 'Mouse sized. The grass is up to your chest.');
   if (k < 0.025) once('s2', 'The grass is a forest now.');
   if (k < 0.0045) once('s3', 'Ant sized. A pebble is a hill. A stair would be a mountain. Falls are counted in body heights now.', 6);
-  if (k < 0.0012) once('s4', 'Sand grains look like boulders.');
-  if (k < 9e-5) once('s5', 'Silt and clay. Every speck is a different rock.');
+  const org = !/grain|rock|metal/.test(S.under || '');
+  if (k < 0.0012) once('s4', org ? 'Crumbs of soil are boulders now. Dead leaves, roots, fungus, all broken down.' : 'Sand grains look like boulders.');
+  if (k < 9e-5) once('s5', org ? 'Clay and rotting plant bits. Soil is more alive than anything up there.' : 'Silt and clay. Every speck is a different rock.');
   if (k < 2.5e-5) once('s6', 'Bacteria. Billions of them live in one handful of soil.', 5);
   if (k < 1.2e-6) once('s7', 'You are smaller than a bacterium.');
   if (k < 3e-7) once('s8', 'Light waves are bigger than you now. Light can\'t show you anything. Electron vision on.', 6);
   if (k < 2.5e-7) once('s9', 'Viruses. These ones hunt bacteria.');
 }
 function realmLines(i) {
-  const L = ['DNA - the code of every living thing. Water molecules everywhere, shoving you around.', 'You are inside the sand grain you were standing on: a quartz crystal. Blue = silicon, red = oxygen.', 'An atom is almost all empty space. The nucleus is 100,000 times smaller than the atom. The suit marks it.', 'Held together by the strongest force there is.', 'Particles pop in and out of existence here.', 'From here down, nobody knows what is real. Keep going and you hit the Planck length.', 'There is no smaller. You are past the edge of reality. Get out (E).'];
+  const Q = S.deepMat === 'quartz';
+  const L = [Q ? 'The surface of the grain you stood on. Flat crystal terraces, each step one atom high, under a skin of water.' : 'DNA and proteins - the machines of life. Water molecules everywhere, shoving you around.', Q ? 'Inside the grain: a quartz crystal. Blue = silicon, red = oxygen.' : 'Inside living stuff: chains of carbon (gray), oxygen (red), nitrogen (blue), hydrogen (white). Every atom shakes from heat.', Q ? 'A silicon atom: 14 electrons as a cloud. The nucleus is 100,000 times smaller. The suit marks it.' : 'A carbon atom: 6 electrons as a cloud. The nucleus is 100,000 times smaller. The suit marks it.', Q ? 'Silicon-28. Held together by the strongest force there is.' : 'Carbon-12. Every living thing on Earth is built on this. Held together by the strongest force there is.', 'Particles pop in and out of existence here.', 'From here down, nobody knows what is real. Keep going and you hit the Planck length.', 'There is no smaller. You are past the edge of reality. Get out (E).'];
   setTimeout(() => ui.message(L[i], 6), 1800);
 }
 function die() {
@@ -368,6 +472,33 @@ function die() {
   const st = S.stats, mins = (performance.now() - st.t0) / 60000;
   setTimeout(() => ui.death(S.body.cause || 'Unknown', { lived: mins, smallest: fmtSize(1.8 * st.smallest), fastest: fmtSpeed(st.fastest), dist: st.dist }), 1600);
 }
+
+// ---------------- saving + the respawn machine ----------------
+function save() {
+  if (S.mode === 'menu' || S.body.dead || !S.stats) return;
+  const b = S.body;
+  store.set('save', { v: 2, seed, P: S.P, logK: S.logK, power: S.power, spawn: S.spawn, lives: S.lives || 1, paint: avatar.paintI, suit: { ...suit },
+    body: { hp: b.hp, bleed: b.bleed, broken: b.broken, burn: b.burn, blood: b.blood, infected: b.infected || 0, lost: b.lost }, lived: (performance.now() - S.stats.t0) / 1000, at: Date.now() });
+}
+function loadSave() {
+  const d = store.get('save', null); if (!d || d.v !== 2) return false;
+  if (d.seed !== seed) { seed = d.seed; land = makeLand(seed); terrain.dispose(); terrain = new Terrain(land, T, macro); for (const C of scatter.classes) C.meshes.forEach(m => macro.remove(m)); scatter = buildScatter(land); }
+  newLife(false);
+  Object.assign(S, { P: { ...d.P }, logK: d.logK, k: Math.pow(10, d.logK), power: d.power, spawn: d.spawn, lives: d.lives });
+  Object.assign(S.body, JSON.parse(JSON.stringify(d.body))); S.body.lost ||= {}; avatar.resetCuts(); for (const p in S.body.lost) if (S.body.lost[p]) avatar.cut(p); Object.assign(suit, d.suit); bench.sync?.();
+  S.stats.t0 = performance.now() - (d.lived || 0) * 1000; S.peakY = S.P.y; rebase();
+  ui.message('Welcome back. Life #' + S.lives + '.', 3); return true;
+}
+// you wake up in a fresh body printed by the machine. The land, your suit mods and the machine stay.
+function respawn() {
+  S.lives = (S.lives || 1) + 1; const sp = S.spawn;
+  Object.assign(S, { P: { x: sp.x, y: sp.my + 0.31, z: sp.z }, V: { x: 0, z: 0 }, vyBH: 0, onGround: true, logK: 0, k: 1, mult: 1, speedOn: false, power: 100, heat: 0, coreTemp: 25, realm: -1, boomed: false, sizing: 0, fallBH: 0, deep: false, deepMat: null });
+  S.peakY = S.P.y; S.body.reset(); avatar.resetCuts(); macro.visible = true; deep.group.visible = false; deep.lights.visible = false; sun.visible = true; hemi.visible = true; scene.background = sky;
+  rebase(); S.mode = 'play'; ui.show('hud'); canvas.requestPointerLock?.(); audio.zap(true); post.U.uFlash.value = 0.8; post.U.uGlitch.value = 1; S.printT = 2.5; S.camYaw = Math.PI; // facing out the door
+  ui.message('The machine printed you a new body. Life #' + S.lives + '.', 5); save();
+}
+setInterval(() => { if (S.mode === 'play') save(); }, 15000);
+addEventListener('beforeunload', save);
 
 // ---------------- frame ----------------
 const landFog = new THREE.FogExp2(0xbfcad6, 0.001), deepFog = new THREE.FogExp2(0, 0.01), deepBg = new THREE.Color(), streakBg = new THREE.Color(0x0b0d18);
@@ -379,6 +510,16 @@ function frame() {
   const dt = Math.min(clock.getDelta(), 0.05); S.t += dt; const tA = performance.now(); renderer.info.reset();
   if (S.mode === 'mod') { if (S.body.dead) { closeBench(); return; } bench.frame(dt); audio.update(dt, { speed: 0, fallBH: 0, k: S.k, deep: false, sizing: 0, realm: 0, health: S.body.health, dead: false, menu: true }); return; }
   if (S.mode === 'play' || S.mode === 'dead') simulate(dt);
+  if (S.spawn) machine.position.set(S.spawn.mx - S.O.x, S.spawn.my - S.O.y, S.spawn.mz - S.O.z);
+  // rings glow in your suit color, brighter right after it printed you
+  S.printT = Math.max(0, (S.printT || 0) - dt); MAT.glow.color.copy(avatar.paintU.uGlow.value).multiplyScalar(1.4 + S.printT * 3 + Math.sin(S.t * 2) * 0.2);
+  if (S.scrLives !== S.lives) { S.scrLives = S.lives; drawScreen(S.lives || 1, 'ready'); }
+  ants.land = land; ants.seed = seed;
+  const gfn = (x, z) => land.height(x, z, Math.max(1e-6, 1.8 * S.k / 17));
+  ants.update(dt, { P: S.P, O: S.O, k: S.k, deep: S.deep || S.mode === 'menu', body: S.body, moving: Math.hypot(S.V.x, S.V.z) > 0.1, speedBH: S.speedBH || 0, inAir: S.inAir }, gfn);
+  if (!S.deep && S.mode === 'play' && S.body.bleeding > 0.02) { S.dripT = (S.dripT || 0) - dt; if (S.dripT <= 0) { const bl = S.body.bleeding; S.dripT = Math.max(0.1, 0.8 / (bl * 4)); const ps = PARTS.filter(p => S.body.bleed[p] > 0.02), p = ps[Math.floor(Math.random() * ps.length)], lost = S.body.lost[p]; gore.spray(partPoint(p), new THREE.Vector3((Math.random() - 0.5) * 0.3, lost ? 0.5 : -0.2, (Math.random() - 0.5) * 0.3), lost ? 5 : 1, BH(), lost ? 1.1 : 0.12); } }
+  gore.update(dt, S.O, gfn);
+  life.update(dt, { P: S.P, O: S.O, k: S.k, deep: S.deep || S.mode === 'menu', body: S.body, moving: Math.hypot(S.V.x, S.V.z) > 0.1 }, (x, z) => land.height(x, z, Math.max(1e-6, 1.8 * S.k / 17)));
   if (S.mode === 'menu') { S.camYaw += dt * 0.03; }
   // camera control
   if (S.mode === 'play') {
@@ -396,7 +537,7 @@ function frame() {
     macro.visible = !streak;
     if (!streak) {
       terrain.update(S.P, k, speed > 2000 ? 1 : 2, fast);
-      if (speed < 2000) scatter.update(S.P, k, 2); else scatter.classes.forEach(C => { if (C.n && C.id !== 1) { C.meshes.forEach(m => m.count = 0); C.n = 0; C.last = null; } });
+      if (speed < 2000) scatter.update(S.P, k, 2, speed > 9 * BH()); else scatter.classes.forEach(C => { if (C.n && C.id !== 1) { C.meshes.forEach(m => m.count = 0); C.n = 0; C.last = null; } });
     }
     macro.position.set((S.O.x - S.P.x) / k, (S.O.y - S.P.y) / k, (S.O.z - S.P.z) / k); macro.scale.setScalar(1 / k);
     const R = 0.0009 * k; // haze per render unit (real air) + a minimum so tiny worlds fade into the distance
@@ -413,7 +554,7 @@ function frame() {
   const tgt = tmpV.set(0, S.mode === 'menu' ? 1.6 : 1.35, 0);
   const cx = Math.sin(S.camYaw) * Math.cos(pitch) * dist, cz = Math.cos(S.camYaw) * Math.cos(pitch) * dist;
   let cy = tgt.y + Math.sin(pitch) * dist;
-  if (!S.deep) { const gy = (groundAt(S.P.x + cx * k, S.P.z + cz * k).y - S.P.y) / k; if (cy < gy + 0.3) cy = gy + 0.3; }
+  if (!S.deep) { const gy = (land.height(S.P.x + cx * k, S.P.z + cz * k, 1.8 * k / 17) - S.P.y) / k; if (cy < gy + 0.25) cy = gy + 0.25; }
   camera.position.set(cx, cy, cz);
   if (S.shake > 0) { S.shake -= dt * 1.5; camera.position.x += (Math.random() - 0.5) * S.shake * 0.3; camera.position.y += (Math.random() - 0.5) * S.shake * 0.3; }
   camera.lookAt(tgt);
@@ -432,11 +573,12 @@ function frame() {
   const tB = performance.now(); post.render(scene, camera, S.t); renderer.getContext().finish?.(); const tC = performance.now();
   prof.js = prof.js * 0.9 + (tB - tA) * 0.1; prof.gpu = prof.gpu * 0.9 + (tC - tB) * 0.1;
   // sound + screen text
-  audio.update(dt, { speed: S.deep ? 0 : v, fallBH: S.fallBH || 0, k, deep: S.deep, sizing: S.sizing, realm: Math.max(0, S.realm), health: hp, dead: S.body.dead, menu: S.mode === 'menu' });
+  if (U.uBreak.value > 0.05 && !S.tearing) { S.tearing = true; audio.tear(); } else if (U.uBreak.value < 0.02) S.tearing = false;
+  audio.update(dt, { tear: U.uBreak.value, speed: S.deep ? 0 : v, fallBH: S.fallBH || 0, k, deep: S.deep, sizing: S.sizing, realm: Math.max(0, S.realm), health: hp, dead: S.body.dead, menu: S.mode === 'menu' });
   hudT -= dt;
   if (hudT <= 0 && (S.mode === 'play' || S.mode === 'dead')) {
     hudT = 0.1;
-    ui.hud({ size: fmtSize(1.8 * k), as: asBigAs(1.8 * k), speed: v, deep: S.deep, realm: S.realm >= 0 ? REALMS[S.realm].name : '', body: S.body, power: S.power, temp: S.coreTemp, speedOn: S.speedOn, suit, k, planck: k < PLANCK_K });
+    ui.hud({ size: fmtSize(1.8 * k), as: asBigAs(1.8 * k), speed: v, deep: S.deep, realm: S.realm >= 0 ? realmName(S.realm, S.deepMat) : '', body: S.body, power: S.power, temp: S.coreTemp, speedOn: S.speedOn, suit, k, planck: k < PLANCK_K });
   }
   autoQuality(dt);
 }
@@ -445,8 +587,10 @@ const lerpAngle = (a, b, t) => { let d = ((b - a + Math.PI) % (Math.PI * 2) + Ma
 // start: menu over the real land
 newLife(false);
 ui.show('menu'); ui.loading(1);
+if (store.get('save', null)?.v === 2) document.querySelector('#btnContinue').style.display = 'block';
+avatar.setPaint(store.get('paint', 0));
 for (let i = 0; i < 30; i++) terrain.update(S.P, 1, 6);
 scatter.update(S.P, 1, 20);
-window.__ol = { G, THREE, prof, S, suit, bench, scatter, terrain, land, keys, renderer, quality, newLife, deep, post, camera };
+window.__ol = { ants, gore, hitYou, audio, life, avatar, G, THREE, prof, S, suit, bench, scatter, terrain, land, keys, renderer, quality, newLife, deep, post, camera };
 requestAnimationFrame(frame);
 setInterval(() => fetch('/alive').catch(() => {}), 20000);

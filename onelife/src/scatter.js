@@ -53,11 +53,11 @@ export class Scatter {
     this.classes.push(C); return C;
   }
   setOrigin(O) { this.O = { ...O }; for (const C of this.classes) C.last = null; }
-  update(P, k, maxBuilds = 3) {
+  update(P, k, maxBuilds = 3, fast = false) {
     let builds = 0;
     this.colliders.length = 0;
     for (const C of this.classes) {
-      const on = k >= C.kMin && k <= C.kMax;
+      const on = k >= C.kMin && k <= C.kMax && !(fast && C.id !== 1); // going fast: only the big stuff (small stuff is a blur anyway)
       if (!on) { if (C.n) { C.meshes.forEach(m => m.count = 0); C.n = 0; } C.last = null; continue; }
       const R = Math.min(C.rMax, Math.max(C.rMin, C.rBH * 1.8 * k));
       const L = C.last;
@@ -65,6 +65,7 @@ export class Scatter {
       if (need && builds < maxBuilds) { this.build(C, P, k, R); builds++; }
       if (C.collide) for (const c of C.cols || []) this.colliders.push(c);
     }
+    this.buildGrid(k);
     return builds;
   }
   build(C, P, k, R) {
@@ -90,16 +91,32 @@ export class Scatter {
       _e.set(tilt, yaw, tilt2); _q.setFromEuler(_e); _s.set(sc, sc * (C.squash ? 0.6 + r() * 0.5 : 1), sc);
       _p.set(x - O.x, y - O.y, z - O.z); _m.compose(_p, _q, _s);
       C.meshes[vi].setMatrixAt(counts[vi]++, _m);
-      if (C.collide) cols.push({ x, z, y: y + h * (C.squash ? 0.8 : 1) * (1 - (C.sink || 0)) * 0.95 + h * (C.sink || 0) * 0, base: y, rx: v.size.x * sc * 0.45, rz: v.size.z * sc * 0.45, h: h * (1 - (C.sink || 0)), yaw, kind: C.kind || 'rock' });
+      if (C.collide) cols.push({ x, z, y: y + h * (C.squash ? 0.8 : 1) * (1 - (C.sink || 0)) * 0.95 + h * (C.sink || 0) * 0, base: y, rx: v.size.x * sc * 0.45, rz: v.size.z * sc * 0.45, h: h * (1 - (C.sink || 0)), yaw, kind: v.kind || C.kind || 'rock' });
     }
     C.meshes.forEach((m, i) => { m.count = counts[i]; m.instanceMatrix.needsUpdate = true; });
     C.n = counts.reduce((a, b) => a + b, 0); C.cols = cols;
     C.last = { x: P.x, z: P.z, k };
   }
   // the top of whatever you're standing on at x,z (meters). Returns -Infinity if nothing.
+  // grid so 'what's under me' only looks at things right next to you (was: every rock + grain in view, many times a frame)
+  buildGrid(k) {
+    const G = this.G = Math.max(1e-9, 1.8 * k), grid = this.grid = new Map(), big = this.big = [];
+    for (const c of this.colliders) {
+      if (Math.max(c.rx, c.rz) > G) { big.push(c); continue; }
+      const key = Math.floor(c.x / G) * 73856093 ^ Math.floor(c.z / G) * 19349663; let a = grid.get(key); if (!a) grid.set(key, a = []); a.push(c);
+    }
+  }
+  near(x, z) {
+    if (!this.grid) return this.colliders;
+    const out = this._near || (this._near = []); out.length = 0; for (const c of this.big) out.push(c);
+    const G = this.G, ix = Math.floor(x / G), iz = Math.floor(z / G);
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const l = this.grid.get((ix + a) * 73856093 ^ (iz + b) * 19349663); if (l) for (const c of l) out.push(c); }
+    return out;
+  }
   topAt(x, z) {
     let best = -Infinity, kind = null;
-    for (const c of this.colliders) {
+    for (const c of this.near(x, z)) {
+      if (c.kind === 'plant') continue; // leaves + stems bend, you can't stand on top of them
       const dx = x - c.x, dz = z - c.z;
       const cs = Math.cos(c.yaw), sn = Math.sin(c.yaw);
       const lx = (dx * cs - dz * sn) / c.rx, lz = (dx * sn + dz * cs) / c.rz;

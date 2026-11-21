@@ -4,6 +4,7 @@
 // -> inside a proton (3 quarks + the gluon field) -> below anything ever measured -> the Planck length -> past it.
 import * as THREE from 'three';
 import { cellRand } from './noise.js';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 export const REALMS = [
   { id: 'molecules', name: 'Molecules', hi: 1e-7, lo: 3e-10, bg: 0x1c1f24, fog: 0.012 },
@@ -35,7 +36,7 @@ export class Deep {
     this.lights = new THREE.Group(); this.lights.add(this.light, this.key); this.lights.visible = false; scene.add(this.lights);
   }
   // build the world for realm i around q=0. unit = typical size (meters)
-  enter(i, seed, dir) {
+  enter(i, seed, dir, mat = 'life') {
     if (this.items) { this.group.remove(this.items.pivot); this.items.root.traverse(o => { o.geometry?.dispose(); }); }
     this.realm = i; const R = REALMS[i];
     // things you shrink toward (atom, nucleus, quarks) appear in front of where you're looking
@@ -44,7 +45,7 @@ export class Deep {
     const root = new THREE.Group(); pivot.add(root);
     this.items = { root, pivot, update: () => {} };
     const build = { molecules, atoms, atom, nucleus, quarks, foam, floor }[R.id];
-    build(this.items, seed * 31 + i);
+    build(this.items, seed * 31 + i, mat); this.mat = mat;
     return R;
   }
   update(dt, k, q) {
@@ -82,14 +83,16 @@ function mergeParts(parts) {
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); return g;
 }
 function blobGeo(seed, r0) {
-  const g = new THREE.IcosahedronGeometry(r0, 4), p = g.attributes.position, v = new THREE.Vector3(), r = cellRand(seed, 4, 4);
+  const g = mergeVertices(new THREE.IcosahedronGeometry(r0, 4)), p = g.attributes.position, v = new THREE.Vector3(), r = cellRand(seed, 4, 4);
   const a = [r() * 9, r() * 9, r() * 9, r() * 9];
   for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).normalize(); const n = Math.sin(v.x * 3 + a[0]) * Math.sin(v.y * 4 + a[1]) * 0.18 + Math.sin(v.z * 7 + a[2]) * Math.cos(v.x * 6 + a[3]) * 0.1 + Math.sin(v.y * 13 + v.x * 11) * 0.03; v.multiplyScalar(r0 * (1 + n)); p.setXYZ(i, v.x, v.y, v.z); }
   g.computeVertexNormals(); return g;
 }
-function molecules(I, seed) {
+function molecules(I, seed, kind) {
+  if (kind === 'quartz') return crystalSurface(I, seed);
   const r = cellRand(seed, 5, 5), root = I.root;
-  const mat = new THREE.MeshStandardMaterial({ color: 0xcfd3d8, roughness: 0.55, metalness: 0.05 });
+  const mat = new THREE.MeshStandardMaterial({ color: 0x5f9bff, roughness: 0.45, metalness: 0.05 }); // DNA
+  const PROT = [0xff8a3d, 0x4fd18b, 0xd35cff, 0xffd447, 0xff5d73, 0x3fd0e0].map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.5 }));
   const things = [];
   for (let i = 0; i < 26; i++) {
     const g = dnaGeo(6 + Math.floor(r() * 10), seed + i), m = new THREE.Mesh(g, mat);
@@ -97,7 +100,7 @@ function molecules(I, seed) {
     root.add(m); things.push({ m, w: new THREE.Vector3(r() - 0.5, r() - 0.5, r() - 0.5).multiplyScalar(0.05) });
   }
   for (let i = 0; i < 70; i++) {
-    const m = new THREE.Mesh(blobGeo(seed * 7 + i, (2.5 + r() * 7) * 1e-9), mat);
+    const m = new THREE.Mesh(blobGeo(seed * 7 + i, (2.5 + r() * 7) * 1e-9), PROT[i % PROT.length]);
     m.position.set((r() - 0.5) * 200e-9, (r() - 0.5) * 110e-9, (r() - 0.5) * 200e-9); root.add(m);
     things.push({ m, w: new THREE.Vector3(r() - 0.5, r() - 0.5, r() - 0.5).multiplyScalar(0.3) });
   }
@@ -106,11 +109,12 @@ function molecules(I, seed) {
   for (let i = 0; i < N; i++) { P.set([(r() - 0.5) * 160e-9, (r() - 0.5) * 90e-9, (r() - 0.5) * 160e-9], i * 3); const l = 0.35 + r() * 0.3; C.set([l, l, l], i * 3); }
   const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(P, 3)); pg.setAttribute('color', new THREE.BufferAttribute(C, 3));
   const pts = new THREE.Points(pg, pointsMat(0.6e-9, 0.5)); root.add(pts);
-  I.update = (t, k, q, dt) => { for (const o of things) { o.m.rotation.x += o.w.x * dt; o.m.rotation.y += o.w.y * dt; } pts.material.userData.ms = Math.max(0.6e-9, k * 0.05); };
+  I.update = (t, k, q, dt) => { for (const o of things) { o.m.rotation.x += o.w.x * dt; o.m.rotation.y += o.w.y * dt; o.v ??= new THREE.Vector3(); o.v.x += (Math.random() - 0.5) * 6e-9 * dt; o.v.y += (Math.random() - 0.5) * 6e-9 * dt; o.v.z += (Math.random() - 0.5) * 6e-9 * dt; o.v.multiplyScalar(Math.exp(-dt)); o.m.position.addScaledVector(o.v, dt); } pts.material.userData.ms = Math.max(0.6e-9, k * 0.05); };
 }
 
 // ---------- atoms: cristobalite (a form of quartz, SiO2): Si on a diamond lattice (a = 0.716 nm), O between ----------
-function atoms(I, seed) {
+function atoms(I, seed, mat) {
+  if (mat !== 'quartz') return organicAtoms(I, seed);
   const a = 0.716e-9, root = I.root, si = [], ox = [];
   const basis = [[0, 0, 0], [0, .5, .5], [.5, 0, .5], [.5, .5, 0], [.25, .25, .25], [.25, .75, .75], [.75, .25, .75], [.75, .75, .25]];
   const nb = [[.25, .25, .25], [-.25, -.25, .25], [-.25, .25, -.25], [.25, -.25, -.25]];
@@ -133,12 +137,13 @@ function atoms(I, seed) {
 }
 
 // ---------- inside one atom: electron cloud as a probability haze, nucleus 100,000x smaller in the middle ----------
-function atom(I, seed) {
+function atom(I, seed, mat) {
+  const C6 = mat !== 'quartz'; // carbon (life) or silicon (rock/sand)
   const root = I.root, r = cellRand(seed, 8, 8), N = 14000, P = new Float32Array(N * 3), C = new Float32Array(N * 3);
-  const R = 1.1e-10;
+  const R = C6 ? 0.7e-10 : 1.1e-10;
   for (let i = 0; i < N; i++) {
     // 1s/2s/2p/3s/3p shells of silicon: radial probability ~ r^2 e^(-2r/a)
-    const shell = r(), a0 = shell < 0.15 ? 0.05 : shell < 0.55 ? 0.3 : 0.75;
+    const shell = r(), a0 = C6 ? (shell < 0.33 ? 0.08 : 0.55) : (shell < 0.15 ? 0.05 : shell < 0.55 ? 0.3 : 0.75); // C: 2 + 4 electrons, Si: 2 + 8 + 4
     let rr = 0; for (let k = 0; k < 3; k++) rr += -Math.log(1 - r() * 0.999) * a0 / 2; rr *= R;
     const th = Math.acos(2 * r() - 1), ph = r() * Math.PI * 2;
     P.set([rr * Math.sin(th) * Math.cos(ph), rr * Math.cos(th), rr * Math.sin(th) * Math.sin(ph)], i * 3);
@@ -159,13 +164,15 @@ function atom(I, seed) {
 }
 
 // ---------- nucleus: 14 protons + 14 neutrons, each ~1.7 fm across, jiggling ----------
-function nucleus(I, seed) {
+function nucleus(I, seed, mat) {
+  const NN = mat !== 'quartz' ? 12 : 28; // carbon-12: 6 + 6, silicon-28: 14 + 14
   const root = I.root, r = cellRand(seed, 2, 9), list = [];
   const pm = new THREE.MeshStandardMaterial({ color: 0xff8a5c, emissive: 0x6a1d08, roughness: 0.4 });
   const nm = new THREE.MeshStandardMaterial({ color: 0x9aa4b4, emissive: 0x1a1f2a, roughness: 0.45 });
   const geo = new THREE.SphereGeometry(0.85e-15, 32, 24);
   const pts = [];
-  while (pts.length < 28) { const v = new THREE.Vector3(r() - 0.5, r() - 0.5, r() - 0.5).multiplyScalar(6.2e-15); if (v.length() < 3.1e-15 && pts.every(p => p.distanceTo(v) > 1.45e-15)) pts.push(v); }
+  const RN = 1.2e-15 * Math.cbrt(NN) * 0.95; let tries = 0;
+  while (pts.length < NN && tries++ < 200000) { const v = new THREE.Vector3(r() - 0.5, r() - 0.5, r() - 0.5).multiplyScalar(6.2e-15); if (v.length() < RN && pts.every(p => p.distanceTo(v) > 1.45e-15)) pts.push(v); }
   pts.forEach((p, i) => { const m = new THREE.Mesh(geo, i % 2 ? pm : nm); m.position.copy(p); root.add(m); list.push({ m, b: p.clone(), ph: r() * 9 }); });
   const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow(), color: 0xff6a30, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.35 })); halo.scale.setScalar(16e-15); root.add(halo);
   root.position.set(0, 0, -9e-15);
@@ -222,4 +229,64 @@ function floor(I, seed) {
     for (let j = 0; j < N; j++) { const on = Math.sin(t * 5 + ph[j] * 3) > 0.6 ? 1 : 0.05; C[j * 3] = on; C[j * 3 + 1] = on * (0.9 + 0.1 * Math.sin(ph[j])); C[j * 3 + 2] = on; }
     pg.attributes.color.needsUpdate = true; pts.material.userData.ms = k * 1.5;
   };
+}
+
+// names change with what you shrank into
+export function realmName(i, mat) {
+  const life = mat !== 'quartz';
+  return [life ? 'Molecules - DNA, proteins, water' : 'The crystal surface - atom-high steps, a skin of water',
+    life ? 'Atoms - inside living stuff: carbon, oxygen, nitrogen, hydrogen' : 'Atoms - inside the sand grain (quartz crystal)',
+    life ? 'Inside one carbon atom - it is almost all empty' : 'Inside one silicon atom - it is almost all empty',
+    life ? 'The nucleus - carbon-12: 6 protons, 6 neutrons' : 'The nucleus - silicon-28: 14 protons, 14 neutrons',
+    REALMS[4].name, REALMS[5].name, REALMS[6].name][i];
+}
+
+// ---------- quartz surface at the nanometer scale: flat terraces one atom layer high (what an atomic force microscope sees) + water ----------
+function crystalSurface(I, seed) {
+  const r = cellRand(seed, 3, 3), root = I.root, step = 0.43e-9; // one SiO2 layer
+  const mat = new THREE.MeshStandardMaterial({ color: 0xbfc4cc, roughness: 0.25, metalness: 0.1, transparent: true, opacity: 0.9 });
+  const N = 90, geo = new THREE.BoxGeometry(1, 1, 1), im = new THREE.InstancedMesh(geo, mat, N), m4 = new THREE.Matrix4();
+  let h = 0;
+  for (let i = 0; i < N; i++) {
+    // terraces: big flat slabs, each a step down, edges wandering like real crystal steps
+    const w = (40 + r() * 140) * 1e-9, d = (40 + r() * 140) * 1e-9; h -= step * (r() < 0.7 ? 1 : 2);
+    m4.compose(new THREE.Vector3((r() - 0.5) * 240e-9, h - 20e-9 + (i % 9) * step * 0.5, (r() - 0.5) * 240e-9), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, r() * 0.6, 0)), new THREE.Vector3(w, 20e-9, d));
+    im.setMatrixAt(i, m4);
+  }
+  root.add(im);
+  const W = 7000, P = new Float32Array(W * 3), C = new Float32Array(W * 3);
+  for (let i = 0; i < W; i++) { P.set([(r() - 0.5) * 200e-9, r() * 30e-9 - 4e-9, (r() - 0.5) * 200e-9], i * 3); const l = 0.4 + r() * 0.3; C.set([l * 0.8, l * 0.9, l], i * 3); }
+  const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(P, 3)); pg.setAttribute('color', new THREE.BufferAttribute(C, 3));
+  const pts = new THREE.Points(pg, pointsMat(0.6e-9, 0.5)); root.add(pts);
+  const base = P.slice();
+  I.update = (t, k, q, dt) => { // water molecules never sit still
+    for (let i = 0; i < W; i += 3) { P[i * 3] = base[i * 3] + Math.sin(t * 5 + i) * 0.3e-9; P[i * 3 + 1] = base[i * 3 + 1] + Math.cos(t * 4.3 + i * 1.7) * 0.3e-9; }
+    pg.attributes.position.needsUpdate = true; pts.material.userData.ms = Math.max(0.6e-9, k * 0.05);
+  };
+}
+
+// ---------- atoms of living stuff: protein / cellulose chains (C gray, O red, N blue, H white), all vibrating ----------
+function organicAtoms(I, seed) {
+  const r = cellRand(seed, 4, 4), root = I.root, list = [];
+  const COL = { C: [0.42, 0.44, 0.48], O: [0.9, 0.25, 0.2], N: [0.3, 0.45, 1], H: [0.92, 0.92, 0.92] };
+  const SZ = { C: 0.34e-9, O: 0.3e-9, N: 0.32e-9, H: 0.2e-9 };
+  for (let c = 0; c < 70; c++) { // chains wander like real backbones: bond 0.15 nm, ~110 degree turns
+    const p = new THREE.Vector3((r() - 0.5) * 9e-9, (r() - 0.5) * 6e-9, (r() - 0.5) * 9e-9), d = new THREE.Vector3(r() - 0.5, r() - 0.5, r() - 0.5).normalize();
+    for (let i = 0; i < 40; i++) {
+      const el = i % 3 === 1 ? 'N' : i % 7 === 3 ? 'O' : 'C'; list.push([p.clone(), el]);
+      if (r() < 0.7) list.push([p.clone().add(new THREE.Vector3(r() - 0.5, r() - 0.5, r() - 0.5).setLength(0.11e-9)), 'H']);
+      if (el === 'C' && r() < 0.25) list.push([p.clone().add(new THREE.Vector3(r() - 0.5, r() - 0.5, r() - 0.5).setLength(0.12e-9)), 'O']);
+      d.applyAxisAngle(new THREE.Vector3(r() - 0.5, r() - 0.5, r() - 0.5).normalize(), 1.2 * (r() - 0.3)).normalize();
+      p.addScaledVector(d, 0.15e-9);
+    }
+  }
+  for (const el of ['C', 'O', 'N', 'H']) {
+    const L = list.filter(a => a[1] === el), P = new Float32Array(L.length * 3), C = new Float32Array(L.length * 3);
+    L.forEach((a, i) => { P.set([a[0].x, a[0].y, a[0].z], i * 3); C.set(COL[el], i * 3); });
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('color', new THREE.BufferAttribute(C, 3));
+    const pts = new THREE.Points(g, pointsMat(SZ[el], 0.75)); root.add(pts);
+    const base = P.slice(), amp = el === 'H' ? 0.025e-9 : 0.012e-9;
+    I.parts = I.parts || []; I.parts.push(() => { const t = performance.now() / 1000; for (let i = 0; i < P.length; i++) P[i] = base[i] + Math.sin(t * 40 + i * 2.3) * amp; g.attributes.position.needsUpdate = true; });
+  }
+  I.update = () => { for (const f of I.parts) f(); };
 }

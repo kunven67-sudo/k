@@ -52,12 +52,18 @@ void band(int b, vec2 uv, vec2 dx, vec2 dy, float w) {
     vec3 l = textureGrad(tL, uv, dx, dy).rgb, s = textureGrad(tS, uv, dx, dy).rgb, r = textureGrad(tR, uv, dx, dy).rgb;
     c = mix(mix(l, s, 0.35 + vCov.y * 0.5), r, vCov.x); n = mix(textureGrad(tSn, uv, dx, dy).rgb, textureGrad(tRn, uv, dx, dy).rgb, vCov.x);
   } else if (b == 2) {
+    // what's under you decides what you see: rocky ground = sand, meadow ground = dark soil
     vec3 s = textureGrad(tS, uv, dx, dy).rgb, sa = textureGrad(tSa, uv, dx, dy).rgb;
-    c = mix(s, sa, 0.45 + vCov.x * 0.4); n = textureGrad(tSn, uv, dx, dy).rgb;
+    float m = clamp(vCov.x * 1.6 + 0.08, 0.0, 1.0);
+    c = mix(s * vec3(0.82, 0.78, 0.72), sa, m); n = mix(textureGrad(tSn, uv, dx, dy).rgb, textureGrad(tMn, uv, dx, dy).rgb, m);
   } else if (b == 3) {
-    c = textureGrad(tSa, uv, dx, dy).rgb * vec3(1.02, 0.98, 0.94); n = textureGrad(tMn, uv, dx, dy).rgb;
+    float m = clamp(vCov.x * 1.6 + 0.05, 0.0, 1.0);
+    vec3 humus = textureGrad(tS, uv * 1.7, dx * 1.7, dy * 1.7).rgb * vec3(0.62, 0.55, 0.48);
+    c = mix(humus, textureGrad(tSa, uv, dx, dy).rgb * vec3(1.02, 0.98, 0.94), m); n = mix(textureGrad(tSn, uv * 1.7, dx * 1.7, dy * 1.7).rgb, textureGrad(tMn, uv, dx, dy).rgb, m);
   } else {
-    c = textureGrad(tM, uv, dx, dy).rgb * vec3(0.95, 0.92, 0.86); n = textureGrad(tMn, uv, dx, dy).rgb;
+    float m = clamp(vCov.x * 1.6 + 0.05, 0.0, 1.0);
+    vec3 clay = textureGrad(tS, uv * 2.3, dx * 2.3, dy * 2.3).rgb * vec3(0.7, 0.6, 0.5);
+    c = mix(clay, textureGrad(tM, uv, dx, dy).rgb * vec3(0.95, 0.92, 0.86), m); n = textureGrad(tMn, uv, dx, dy).rgb;
   }
   gCol += c * w; gNor += (n * 2.0 - 1.0) * w;
 }

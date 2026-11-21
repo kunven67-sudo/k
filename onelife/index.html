@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ONE LIFE</title>
+<title>ONE LIFE 0.2</title>
 <style>
 @font-face { font-family: Inter; src: url(assets/fonts/inter.woff2) format('woff2'); font-weight: 100 900; }
 :root { --ink: #eef1f4; --dim: rgba(238,241,244,0.6); --line: rgba(238,241,244,0.18); --warn: #e8c35a; --bad: #e0573a; }
@@ -98,13 +98,14 @@ table.keys { border-collapse: collapse; font-size: 14px; } .keys td { padding: 7
     <h1>ONE LIFE</h1>
     <div class="sub">One body. No second chances.</div>
     <div class="items">
-      <button data-act="begin">Begin</button>
+      <button data-act="continue" id="btnContinue" style="display:none">Continue</button>
+      <button data-act="begin">New life</button>
       <button data-open="controls">Controls</button>
       <button data-open="settings">Settings</button>
       <button data-act="quit">Quit</button>
     </div>
   </div>
-  <div class="foot">Piece 1 · the land<br>Real scans from Poly Haven (CC0)</div>
+  <div class="foot">Piece 1 · the land<br>Real scans and sounds (CC0)</div>
 </div>
 
 <div id="settings" class="layer dimbg"><div class="panel">
@@ -123,7 +124,9 @@ table.keys { border-collapse: collapse; font-size: 14px; } .keys td { padding: 7
     <tr><td>Space</td><td>Jump (float up when you're tiny)</td></tr>
     <tr><td>Q / E</td><td>Shrink / grow (hold)</td></tr>
     <tr><td>G</td><td>Speed suit on / off</td></tr>
-    <tr><td>Tab</td><td>Open your suit on the bench</td></tr>
+    <tr><td>Tab</td><td>Open your suit on the bench (P there = repaint it)</td></tr>
+    <tr><td>R</td><td>Suit radio: next station / off</td></tr>
+    <tr><td>F</td><td>Kick (gets an ant off you)</td></tr>
     <tr><td>Mouse</td><td>Look · wheel = camera distance</td></tr>
     <tr><td>Esc</td><td>Pause</td></tr>
   </table>
@@ -161,7 +164,7 @@ table.keys { border-collapse: collapse; font-size: 14px; } .keys td { padding: 7
   <div id="keys">
     <div><b>WASD</b>move &nbsp; <b>Shift</b>run &nbsp; <b>Space</b>jump</div>
     <div><b>Q / E</b>shrink / grow</div>
-    <div><b>G</b>speed suit &nbsp; <b>Tab</b>open your suit</div>
+    <div><b>G</b>speed suit &nbsp; <b>Tab</b>open your suit &nbsp; <b>R</b>radio &nbsp; <b>F</b>kick</div>
   </div>
 </div>
 
@@ -180,12 +183,12 @@ table.keys { border-collapse: collapse; font-size: 14px; } .keys td { padding: 7
     <h2>YOU DIED</h2>
     <div id="dCause"></div>
     <div id="dStats"></div>
-    <div class="items"><button data-act="again">Live again (new land)</button><button data-act="menu">Main menu</button></div>
+    <div class="items"><button data-act="respawn">Wake up in the respawn machine</button><button data-act="again">Start over (new land)</button><button data-act="menu">Main menu</button></div>
   </div>
 </div>
 
 <div id="bench" class="layer">
-  <div class="title"><b>YOUR SUIT</b><div>Power module, opened up. Drag to turn it.</div></div>
+  <div class="title"><b>YOUR SUIT</b><div>Power module, opened up. Drag to turn it. P = repaint the suit.</div></div>
   <div id="benchInfo"></div>
   <div id="benchMsg"></div>
   <div id="tools"></div>

@@ -1,0 +1,24 @@
+== field
+ "title": "Field_ambience_8.wav",
+ "license": "CC0",
+== steps
+ "title": "Foley Outdoor Footsteps Grass at Delta de l'Ebre",
+ "license": "CC0",
+== boom
+ "title": "Breaking the sound barrier",
+ "license": "CC0",
+== zap
+ "title": "Electric zap.wav",
+ "license": "CC0",
+== tuning
+ "title": "AM Tuning.wav",
+ "license": "CC0",
+== meteor
+ "title": "RussianMeteorite_SFX.flac",
+ "license": "CC0",
+
+== radio (all CC0, freesound.org)
+Parallel Universe - Andrewkn
+gameMusic - Magntron
+Peaceful Hip Hop - shortiefoeva2
+Road In The Forest - Andrewkn
