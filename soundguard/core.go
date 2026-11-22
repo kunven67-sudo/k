@@ -190,12 +190,12 @@ type Event struct {
 }
 
 type Settings struct {
-	AutoFix     bool `json:"autoFix"`     // fix things by itself
-	PlugSwitch  bool `json:"plugSwitch"`  // plug headphones in = sound + calls go to them
-	MicReminder bool `json:"micReminder"` // "push the plug all the way in" reminder
-	LiveMic     bool `json:"liveMic"`     // show the live mic level while the window is open
-	UISounds    bool `json:"uiSounds"`    // real click sounds in the window
-	Look        string `json:"look"`      // rack, mix, simple
+	AutoFix     bool   `json:"autoFix"`     // fix things by itself
+	PlugSwitch  bool   `json:"plugSwitch"`  // plug headphones in = sound + calls go to them
+	MicReminder bool   `json:"micReminder"` // "push the plug all the way in" reminder
+	LiveMic     bool   `json:"liveMic"`     // show the live mic level while the window is open
+	UISounds    bool   `json:"uiSounds"`    // real click sounds in the window
+	Look        string `json:"look"`        // rack, mix, simple
 }
 
 func defaultSettings() Settings {
