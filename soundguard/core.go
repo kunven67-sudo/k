@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-const appVersion = "1.2.0"
+const appVersion = "1.3.0"
 
 // ErrStuck = Windows audio didn't answer in time (hung driver / service).
 var ErrStuck = errors.New("windows audio is not answering")
@@ -81,6 +81,7 @@ type Snap struct {
 	DefInComm     string
 	OutPeak       float64 // how loud Windows is sending sound to DefOut right now (0..1)
 	OthersPlaying bool    // some app has an open, running sound stream on DefOut
+	OthersLoud    bool    // ...and it carries real sound right now (not silence)
 	SvcRunning    bool    // Windows Audio service
 	MicBlocked    bool    // Windows privacy switch blocks apps from the mic
 	Busy          bool    // full screen game / presentation: don't pop windows
@@ -162,6 +163,7 @@ type Backend interface {
 	CanSetDefault() bool
 	Probe(id string) ProbeResult // silent check: does the device take sound
 	RestartAudio() error         // restart (or start) the Windows Audio service = 2 s blip
+	KillEffects(id string) error // turn off sound effects (Dell Waves etc) for the device + restart their service
 	FixMicPrivacy() error
 	PlayTest(id string) SoundTest
 	RecordTest(inID, outID string, secs float64, level func(float64)) MicTest
@@ -274,6 +276,8 @@ type Guardian struct {
 	pairFixed  map[string]bool
 	warned     map[string]time.Time
 	svcAt      time.Time
+	eatAt      time.Time // last time I turned the sound effects off because they ate the sound
+	eaten      bool
 	privacyAt  time.Time
 	zeroSince  time.Time
 	lastProbe  time.Time
@@ -767,6 +771,10 @@ func (g *Guardian) checkFlow(s *Snap, out *Dev, now time.Time, auto bool) {
 		was := g.needRestart
 		g.needRestart, g.frozen = false, false
 		g.mu.Unlock()
+		if g.eaten && !was {
+			g.event("good", "Fixed! Sound reaches "+out.short()+" again.")
+		}
+		g.eaten = false
 		if was {
 			g.event("good", "Sound is working again.")
 			g.popupOpen = false
@@ -791,7 +799,12 @@ func (g *Guardian) checkFlow(s *Snap, out *Dev, now time.Time, auto bool) {
 	}
 	g.lastProbe = now
 	switch g.b.Probe(out.ID) {
-	case ProbeOK: // apps are just playing silence
+	case ProbeOK:
+		if s.OthersLoud { // apps send real sound, the device clock moves, but nothing comes out
+			g.onEaten(now, out, auto)
+			return
+		}
+		// apps are just playing silence
 		g.zeroSince = time.Time{}
 		g.probeGap = time.Minute
 	case ProbeBusy, ProbeErr:
@@ -799,6 +812,27 @@ func (g *Guardian) checkFlow(s *Snap, out *Dev, now time.Time, auto bool) {
 	case ProbeStuck:
 		g.onStuck(now, out, auto)
 	}
+}
+
+// onEaten: the driver takes the sound but it never reaches your ears (seen on a Dell PC:
+// Realtek + Dell Waves effect turned everything into silence, restarting the sound service didn't help).
+func (g *Guardian) onEaten(now time.Time, out *Dev, auto bool) {
+	g.setFrozen(true)
+	g.eaten = true
+	if auto && (g.eatAt.IsZero() || now.Sub(g.eatAt) > 20*time.Minute) {
+		g.eatAt = now
+		g.event("fix", "Your apps are playing sound but none of it reaches "+out.short()+". Turning off sound effects (Audio enhancements) and restarting the sound service, 2 second blip.")
+		if err := g.b.KillEffects(out.ID); err != nil {
+			g.event("warn", "Couldn't turn off the sound effects: "+err.Error())
+		}
+		if err := g.b.RestartAudio(); err != nil {
+			g.event("warn", "Couldn't restart the sound service: "+err.Error())
+		}
+		g.zeroSince = time.Time{}
+		g.probeGap = 0
+		return
+	}
+	g.needRestartNow(now, "Your apps are playing sound but none of it reaches "+out.short()+". The sound driver is stuck.")
 }
 
 func (g *Guardian) setFrozen(v bool) {

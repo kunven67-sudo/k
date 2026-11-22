@@ -402,3 +402,41 @@ func TestSoundTestNotSentTriggersFix(t *testing.T) {
 	r.g.HeardAnswer(false)
 	r.must("Your sound is frozen. Restarting")
 }
+
+// Dell PC case: apps loud, device clock moving, but the device meter stays 0 (Dell Waves effect ate it).
+func TestEatenFixedByEffectsOff(t *testing.T) {
+	r := newRig(t)
+	r.run(3)
+	r.f.Set(func(f *FakePC) { f.Eaten = true })
+	r.run(9)
+	r.must("none of it reaches")
+	if !strings.Contains(strings.Join(r.f.Calls, "|"), "kill-effects ") || r.f.Restarts != 1 {
+		t.Fatalf("calls %v restarts %d", r.f.Calls, r.f.Restarts)
+	}
+	r.run(3)
+	r.must("Fixed! Sound reaches")
+	if r.g.State().NeedRestart || len(r.ui.popups) != 0 {
+		t.Fatal("should be fixed without a PC restart")
+	}
+}
+
+func TestEatenNeedsRestart(t *testing.T) {
+	r := newRig(t)
+	r.f.Set(func(f *FakePC) { f.Eaten, f.HardEaten = true, true })
+	r.run(30)
+	if !r.g.State().NeedRestart {
+		t.Fatal("still eaten after effects off = needs a PC restart popup")
+	}
+	if r.f.Reboots != 0 {
+		t.Fatal("NEVER restart the PC by itself")
+	}
+	n := 0
+	for _, c := range r.f.Calls {
+		if strings.HasPrefix(c, "kill-effects") {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Fatalf("kill-effects %d times (want 1, no loop)", n)
+	}
+}

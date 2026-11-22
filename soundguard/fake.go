@@ -24,6 +24,8 @@ type FakePC struct {
 	S          Snap
 	Frozen     bool // device stopped taking sound
 	HardFrozen bool // ...and a service restart doesn't help (needs a PC restart)
+	Eaten      bool // sound effect eats the sound: clock moves, apps loud, device meter 0
+	HardEaten  bool // ...and turning effects off doesn't help
 	CanDef     bool
 	Playing    bool    // a game/video is playing sound
 	Level      float64 // how loud it plays
@@ -63,7 +65,8 @@ func (f *FakePC) Snapshot() (Snap, error) {
 	s := f.S
 	s.Devs = append([]Dev(nil), f.S.Devs...)
 	s.OthersPlaying = f.Playing
-	if f.Playing && !f.Frozen && s.SvcRunning {
+	s.OthersLoud = f.Playing && f.Level > 0
+	if f.Playing && !f.Frozen && !f.Eaten && s.SvcRunning {
 		if d := s.dev(s.DefOut); d.active() && !d.Muted {
 			s.OutPeak = f.Level
 		}
@@ -122,6 +125,16 @@ func (f *FakePC) Probe(id string) ProbeResult {
 		return ProbeStuck
 	}
 	return ProbeOK
+}
+
+func (f *FakePC) KillEffects(id string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.call("kill-effects " + id)
+	if !f.HardEaten {
+		f.Eaten = false
+	}
+	return nil
 }
 
 func (f *FakePC) RestartAudio() error {

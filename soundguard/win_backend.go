@@ -171,6 +171,24 @@ func (b *winBackend) RestartAudio() error {
 	return err
 }
 
+// KillEffects: Audio enhancements OFF for the device + restart Dell's Waves service
+// (it tells the effect what to do; a confused one mutes everything).
+func (b *winBackend) KillEffects(id string) error {
+	var err error
+	b.run(5*time.Second, func(a *audio) error { err = a.noEffects(id); return nil })
+	if err != nil {
+		logf("effects off %s: %v", id, err)
+	} else {
+		logf("effects off %s: ok", id)
+	}
+	for _, sv := range []string{"WavesSysSvc", "WavesAudioService"} {
+		if e := restartService(sv); e != nil {
+			logf("restart %s: %v", sv, e)
+		}
+	}
+	return err
+}
+
 func (b *winBackend) PlayTest(id string) SoundTest {
 	var r SoundTest
 	done := make(chan struct{})

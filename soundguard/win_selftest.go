@@ -23,6 +23,7 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 )
 
 type stStep struct {
@@ -112,6 +113,15 @@ func selftest(args []string) int {
 	var pk float64
 	b.run(4*time.Second, func(a *audio) error { others = a.othersPlaying(out.ID); pk = a.peak(out.ID); return nil })
 	R.add("sees other app playing", true, others && pk > 0.01, map[string]any{"others": others, "peak": pk}, nil)
+	var loud bool
+	b.run(4*time.Second, func(a *audio) error { _, loud = a.othersSound(out.ID); return nil })
+	R.add("sees other app's sound is real (not silence)", true, loud, nil, nil)
+	// Audio enhancements off (a Dell Waves effect can eat all sound)
+	ke := b.KillEffects(out.ID)
+	fx := fxOff(out.ID)
+	R.add("sound effects turned off", false, ke == nil && fx == 1, fx, ke)
+	pr3 := b.Probe(out.ID)
+	R.add("sound still moves after effects off", true, pr3 == ProbeOK, pr3, nil)
 	// guardian with the real PC: mute it, one tick must unmute it
 	tmp := filepath.Join(outDir, "sg-test-data")
 	os.RemoveAll(tmp)
@@ -486,4 +496,22 @@ func capture(hw uintptr) string {
 	var jb bytes.Buffer
 	jpeg.Encode(&jb, small, &jpeg.Options{Quality: 72})
 	return base64.StdEncoding.EncodeToString(jb.Bytes())
+}
+
+// fxOff reads Windows' "Audio enhancements off" flag for a device (1 = off).
+func fxOff(id string) int {
+	i := strings.LastIndex(id, ".")
+	if i < 0 {
+		return -1
+	}
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render\`+id[i+1:]+`\FxProperties`, registry.QUERY_VALUE)
+	if err != nil {
+		return -2
+	}
+	defer k.Close()
+	v, _, err := k.GetIntegerValue("{1da5d803-d492-4edd-8c23-e0c0ffee7f0e},5")
+	if err != nil {
+		return -3
+	}
+	return int(v)
 }

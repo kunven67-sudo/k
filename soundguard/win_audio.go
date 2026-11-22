@@ -75,6 +75,7 @@ type audio struct {
 	static   map[string]*devStatic
 	jacks    map[string]jackInfo
 	pc       com // IPolicyConfig (0 = not available)
+	pcIdx    int // which IID it answered to (0/1 = Win 7+ layout, 2 = Vista layout)
 	pcTried  time.Time
 	pcErr    string
 	meterID  string
@@ -378,19 +379,27 @@ func (a *audio) peak(id string) float64 {
 
 // othersPlaying = another app has a running (Active) stream on this device.
 func (a *audio) othersPlaying(id string) bool {
+	p, _ := a.othersSound(id)
+	return p
+}
+
+// othersSound: playing = some other app has a running sound stream on the device;
+// loud = one of those streams carries REAL sound right now (its own meter is above 0).
+// loud + device meter 0 = the sound gets eaten after the apps (a sound effect / stuck driver).
+func (a *audio) othersSound(id string) (playing, loud bool) {
 	dev, err := a.device(id)
 	if err != nil {
-		return false
+		return false, false
 	}
 	defer dev.Release()
 	sm, err := activate(dev, &iidIAudioSessionManager2)
 	if err != nil {
-		return false
+		return false, false
 	}
 	defer sm.Release()
 	var e uintptr
 	if hrErr(sm.call(5, uintptr(unsafe.Pointer(&e)))) != nil || e == 0 {
-		return false
+		return false, false
 	}
 	en := com(e)
 	defer en.Release()
@@ -413,12 +422,22 @@ func (a *audio) othersPlaying(id string) bool {
 				c2.Release()
 			}
 		}
-		ctl.Release()
 		if st == 1 && !mine && time.Since(a.lastPlay) > 3*time.Second {
-			return true
+			playing = true
+			if m, err := ctl.QI(&iidIAudioMeterInfo); err == nil {
+				var f float32
+				if hrErr(m.call(3, uintptr(unsafe.Pointer(&f)))) == nil && f > 0.002 {
+					loud = true
+				}
+				m.Release()
+			}
+		}
+		ctl.Release()
+		if loud {
+			return true, true
 		}
 	}
-	return false
+	return playing, false
 }
 
 // policy = IPolicyConfig, the only way to switch the default device.
@@ -435,7 +454,7 @@ func (a *audio) policy() (com, error) {
 		for i := range iidPolicyConfigs {
 			pc, err := coCreate(cl, &iidPolicyConfigs[i], clsctxAll)
 			if err == nil {
-				a.pc = pc
+				a.pc, a.pcIdx = pc, i
 				logf("IPolicyConfig ok: clsid %v iid %v", *cl, iidPolicyConfigs[i])
 				return pc, nil
 			}
@@ -554,7 +573,35 @@ func (a *audio) snapshot() (Snap, error) {
 	s.DefInComm = a.defaultID(eCapture, 2)
 	s.OutPeak = a.peak(s.DefOut)
 	if s.OutPeak <= 0.00001 && s.DefOut != "" {
-		s.OthersPlaying = a.othersPlaying(s.DefOut)
+		s.OthersPlaying, s.OthersLoud = a.othersSound(s.DefOut)
 	}
 	return s, nil
+}
+
+// noEffects: turn off "Audio enhancements" for a device (= Windows' own switch,
+// PKEY_AudioEndpoint_Disable_SysFx in the effects store). Dell's Waves effect sits there
+// and can turn ALL sound into silence while everything else looks fine.
+func (a *audio) noEffects(id string) error {
+	pc, err := a.policy()
+	if err != nil {
+		return err
+	}
+	slot := 12 // SetPropertyValue (Win 7+ layout)
+	if a.pcIdx == 2 {
+		slot = 11 // Vista layout
+	}
+	type propKey struct {
+		fmtid windows.GUID
+		pid   uint32
+	}
+	type propVar struct {
+		vt         uint16
+		r1, r2, r3 uint16
+		val        uint32
+		_          [12]byte
+	}
+	key := propKey{mustGUID("{1DA5D803-D492-4EDD-8C23-E0C0FFEE7F0E}"), 5}
+	v := propVar{vt: 19, val: 1} // VT_UI4 = 1 -> effects OFF
+	p, _ := windows.UTF16PtrFromString(id)
+	return hrErr(pc.call(slot, uintptr(unsafe.Pointer(p)), 1, uintptr(unsafe.Pointer(&key)), uintptr(unsafe.Pointer(&v))))
 }
