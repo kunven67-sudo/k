@@ -45,7 +45,23 @@ async function loadCursors() {
   Render.setCursors(out);
   const a = out.arrow; Liquid.setMask(a.rgba, a.w, a.h, a.hx, a.hy, 1);
 }
-loadCursors();
+// draw every look once while hidden, so the graphics card has everything ready before the first click
+function warmup() { try {
+  Render.begin();
+  Fluid.active = 1; Fluid.step(1 / 60, {}); Fluid.splat(-50, -50, 4, [0, 0, 0, 0], [0, 0]); Effects._drawFluid(); Fluid.active = 0; Fluid.clear();
+  Liquid.add(-60, -60, 0, 0, 2, 0); Liquid.draw(Render.scene, Render.screenTex, Render.hasScreen, 0); Liquid.clear();
+  for (let t = 0; t < 9; t++) Parts.spawn(t, -60, -60, 0, 0, 1, 1); Parts.draw(Render.scene); Parts.clear();
+  const far = [-900, -900, 10, 10];
+  Shapes.field({ box: far, depth: 1, power: 0, hits: new Float32Array(32) }); Shapes.ice({ box: far, grow: 0, crack: 0, layer: 0, seed: 0 });
+  Shapes.bubble({ b: [-900, -900, 1], wob: 0 }); Shapes.blackhole({ bh: [-900, -900, 0, 0], spin: 0 }); Shapes.frost(0.0001, 0);
+  Shapes.laser({ a: [0, 0], b: [0, 0], on: 0, ret: 0, lock: 0, pulse: 0 }); Shapes.clouds({ amt: 0, flash: 0, at: [0, 0], h: 0 }); Shapes.pin(-900, -900, 1, 0);
+  Shapes.oilDraw(0); Shapes.oilStamp([[-900, -900, 2, 0]]); Shapes.snowbank(new Float32Array(4), 0, 0); Shapes.glowLine([[0, 0], [1, 1]], 1, [0, 0, 0], 0); Shapes.glowFlush();
+  Shapes.rope([[0, 0], [1, 1]], 1, [0, 0, 0], 0); Shapes.cracks([[0, 0, 1, 1, 1, 1]], 0); Shapes.scorch([{ x: -900, y: -900, r: 1, a: 0, seed: 0 }]);
+  Shapes.shards([{ x: -900, y: -900, size: 1, a: 0, rot: 0, seed: 0 }]);
+  Render.drawCursors([{ x: -900, y: -900, key: 'arrow' }], {});
+  Render.finish(); GLX.clear(null);
+} catch (e) { console.error(e); } }
+loadCursors().then(warmup);
 
 // ---------- mouse ----------
 function toLocal(p) { return display ? { x: p.x - display.phys.x, y: p.y - display.phys.y } : p; }

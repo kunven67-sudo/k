@@ -8,13 +8,14 @@ const Effects = (() => {
   const ci = () => Render.cursorInfo(MH.M.shape) || { w: 32, h: 32, hx: 1, hy: 1 };
   const cx = c => c.M.virt.x, cy = c => c.M.virt.y;
   const play = (n, o) => Sfx.play(n, o);
+  const TB = {}; // shared draw batches (made once, reused)
   let fluidProg = null;
   E._drawFluid = () => {
     if (!fluidProg) fluidProg = GLX.program(`in vec2 vUV; out vec4 o; uniform sampler2D uDye;
       void main(){ vec4 d=texture(uDye,vUV); float T=d.r, S=d.g; if(T<0.004&&S<0.004){ o=vec4(0); return; }
                 vec2 px=vUV*uRes; float fl=0.65+0.7*fbm(px*vec2(0.045,0.03)+vec2(0.,uTime*4.));
         float Tf=T*mix(1.,fl,smoothstep(0.05,0.6,T));
-        vec3 em=blackbody(Tf*0.8)*pow(clamp(Tf,0.,2.5),1.7)*2.4*smoothstep(0.1,0.85,Tf);
+        vec3 em=blackbody(Tf*0.8)*pow(clamp(Tf,0.,2.5),1.7)*2.4*smoothstep(0.1,0.85,Tf)*exp(-S*0.55);
         float sa=1.-exp(-S*2.4);
         vec3 sc=mix(vec3(0.12,0.115,0.11),vec3(0.03,0.028,0.026),clamp(S*0.5,0.,1.))+blackbody(0.5)*T*0.5;
         float ea=clamp(dot(em,vec3(0.3,0.5,0.2))*0.75,0.,1.);
@@ -194,14 +195,15 @@ const Effects = (() => {
     end(e) {},
     cursor(e, look, lk) { const f = e.s.fly; if (f) { look.rot = f.spin * f.t; lk.char = Math.max(lk.char || 0, 0.55); }
       else if (e.s.si > 0) lk.char = Math.max(lk.char || 0, 0.55 * clamp(1 - (e.ending ? e.te / 1.5 : 0), 0, 1)); },
-    fluidParams(e, f) { f.buoy = 700; f.vort = 26; },
+    fluidParams(e, f) { f.buoy = 650; f.vort = 30; f.diss = [1.1, 0.22, 0.55, 1]; },
     back(e) { if (e.s.scorch.length) Shapes.scorch(e.s.scorch); },
     front(e, c, time) { const s = e.s; if (s.lock > 0 && !e.ending) Shapes.laser({ a: [s.origin.x, s.origin.y], b: [s.target.x, s.target.y], on: 1, ret: 1, lock: s.lock, pulse: 0.5 + 0.5 * Math.sin(time * (6 + s.lock * 20)) }); },
   };
   function boom(e, c) { const s = e.s; const x = cx(c), y = cy(c);
-    Fluid.splat(x, y, 42, [1.5, 1.4, 1.3, 0], null, { radial: 1700, vr: 95, noise: 0.85 });
-    for (let k = 0; k < 9; k++) { const a = R(0, 6.28), d = R(25, 80); Fluid.splat(x + Math.cos(a) * d, y + Math.sin(a) * d, R(16, 34), [R(0.8, 1.3), R(0.9, 1.6), R(0.6, 1.1), 0], [Math.cos(a) * R(200, 700), Math.sin(a) * R(200, 700) - 300], { noise: 0.9, vr: 40 }); }
-    Fluid.splat(x, y - 40, 60, null, [0, -700]);
+    Fluid.splat(x, y, 34, [1.15, 0.5, 0.85, 0], null, { radial: 1500, vr: 90, noise: 0.9 });
+    for (let k = 0; k < 7; k++) { const a = R(0, 6.28), d = R(20, 60); Fluid.splat(x + Math.cos(a) * d, y + Math.sin(a) * d, R(14, 26), [R(0.6, 1.0), R(0.3, 0.8), R(0.4, 0.8), 0], [Math.cos(a) * R(200, 600), Math.sin(a) * R(200, 600) - 250], { noise: 0.9, vr: 34 }); }
+    for (let k = 0; k < 10; k++) { const a = R(0, 6.28), d = R(50, 110); Fluid.splat(x + Math.cos(a) * d, y + Math.sin(a) * d * 0.8, R(22, 40), [0.05, R(1.2, 2.0), 0, 0], [Math.cos(a) * R(150, 450), Math.sin(a) * R(100, 300) - 350], { noise: 0.8, vr: 40 }); }
+    Fluid.splat(x, y - 40, 60, null, [0, -650]);
     s.wave = { x, y, r: 10, k: 1 }; s.shake = 1; s.flash = 0.75;
     for (let k = 0; k < 140; k++) { const a = R(0, 6.28), sp = R(300, 1800); Parts.spawn(Parts.T.SPARK, x, y, Math.cos(a) * sp, Math.sin(a) * sp - 300, R(0.4, 1.4), R(1.5, 3.5), [1, 1, 1, 1], { heat: R(0.7, 1) }); }
     for (let k = 0; k < 45; k++) { const a = R(-3.0, -0.1), sp = R(300, 1200); Parts.spawn(Parts.T.DEBRIS, x, y, Math.cos(a) * sp, Math.sin(a) * sp, R(1.5, 3), R(4, 11), [0.16, 0.13, 0.11, 1]); }
@@ -257,7 +259,7 @@ const Effects = (() => {
       const N = c.quality ? 2600 : 1400; s.N = N; s.d = new Float32Array(N * 6);
       for (let i = 0; i < N; i++) { const o = i * 6; s.d[o] = R(0, 6.28); s.d[o + 1] = Math.pow(Math.random(), 0.6); s.d[o + 2] = R(0.82, 1.12); s.d[o + 3] = R(0.7, 1.3); s.d[o + 4] = R(0, 1); s.d[o + 5] = R(0, 99); }
       s.deb = []; for (let i = 0; i < 70; i++) s.deb.push({ a: R(0, 6.28), h: R(0, 0.9), r: R(1.1, 1.8), sp: R(0.8, 1.4), size: R(3, 9), seed: R(0, 99) });
-      s.batch = s.batch || Parts.makeBatch(N + 200); s.batchF = s.batchF || Parts.makeBatch(N + 200);
+      s.batch = TB.back || (TB.back = Parts.makeBatch(2900)); s.batchF = TB.front || (TB.front = Parts.makeBatch(2900));
       s.wind = Sfx.loop('blizzard', { vol: 1, fade: 1 }); s.rum = Sfx.loop('rumble', { vol: 0.5, fade: 1 }); },
     R(s, h) { return (14 + 380 * Math.pow(h, 1.8)) * (0.25 + 0.75 * s.pow); },
     mouse(e, m, dt) { const s = e.s, c = MH.ctx;
@@ -395,7 +397,7 @@ const Effects = (() => {
   E.blizzard = {
     name: 'Blizzard', outro: 2.6,
     start(e, c) { const s = e.s; s.bank = new Float32Array(Math.ceil(c.W / 4)); s.pile = []; s.gust = 0; s.k = 0; s.loop = Sfx.loop('blizzard', { vol: 1, fade: 1.2 });
-      s.batch = s.batch || Parts.makeBatch(600);
+      s.batch = TB.pile || (TB.pile = Parts.makeBatch(600));
       Parts.onSnowLand = (x, size) => { const j = clamp(Math.round(x / 4), 0, s.bank.length - 1); for (let q = -2; q <= 2; q++) { const jj = j + q; if (jj >= 0 && jj < s.bank.length) s.bank[jj] = Math.min(120, s.bank[jj] + size * 0.05 * (1 - Math.abs(q) / 3)); } };
       Parts.snowCatch = (i, x, y) => { if (e.ending || s.pile.length > 420) return false; const lx = x - cx(c), ly = y - cy(c);
         if (Liquid.inMask(lx, ly + 2)) { s.pile.push({ x: lx, y: ly - 1, s: R(2.5, 4.5) }); return true; }
