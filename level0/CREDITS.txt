@@ -1,0 +1,5 @@
+LEVEL 0 - credits
+Textures (CC0): ambientCG.com - Carpet016, OfficeCeiling001, OfficeCeiling004, Wallpaper001A, Wallpaper002B, Wallpaper002C
+Textures (CC0): Poly Haven - white_stucco
+Footsteps (CC BY 3.0): "footstep-concrete" by swuing (freesound.org/people/swuing/sounds/38873), via "Footsteps on different surfaces" on OpenGameArt; made softer for carpet
+Engine: three.js (MIT)

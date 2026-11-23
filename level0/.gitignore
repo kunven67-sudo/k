@@ -1,0 +1,4 @@
+node_modules/
+game.js
+worker.js
+tools/launcher/site/
