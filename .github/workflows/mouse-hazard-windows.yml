@@ -47,5 +47,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -f tests/win-results
           git commit -m "MOUSE HAZARD Windows check results" 2>$null
-          git pull --rebase
-          git push
+          git pull --rebase origin claude/sweet-mccarthy-8pwn26
+          git push origin HEAD:claude/sweet-mccarthy-8pwn26

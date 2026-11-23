@@ -120,14 +120,14 @@ const Shapes = (() => {
       void main(){ float t=texture(uOil,vUV).r*uFade; if(t<0.02) { o=vec4(0); return; }
         float l=texture(uOil,vUV-vec2(uTx.x,0)).r, r=texture(uOil,vUV+vec2(uTx.x,0)).r, b=texture(uOil,vUV-vec2(0,uTx.y)).r, tt=texture(uOil,vUV+vec2(0,uTx.y)).r;
         vec2 g=vec2(l-r,b-tt); vec2 px=vUV*uRes;
-        float th=t*1.6+fbm(px*0.01+uTime*0.04)*0.7;
+        float th=t*1.4+fbm(px*0.018+uTime*0.04)*1.8+fbm(px*0.06)*0.4;
         vec3 film=0.5+0.5*cos(6.2831*(th*1.2+vec3(0.,0.33,0.67)));
         vec3 bg=uHasScreen>0.5?texture(uScreen,vUV+g*0.015).rgb:vec3(0.3);
         float a=smoothstep(0.02,0.2,t);
         float thick=smoothstep(0.3,0.95,t);
         vec2 rip=vec2(vnoise(px*0.05+uTime*0.3),vnoise(px*0.05+7.-uTime*0.3))-.5; vec3 n=normalize(vec3(g*10.+rip*0.5*thick,1.)); float sp=pow(max(dot(n,normalize(vec3(-0.4,0.6,0.7))),0.),60.)*1.4;
         vec3 thin=bg*0.7+film*0.24*(1.-thick*0.6);
-        vec3 deep=vec3(0.035,0.028,0.02)+film*0.05;
+        vec3 deep=vec3(0.05,0.038,0.026)+film*0.07;
         vec3 col=mix(thin,deep,thick*0.85)+vec3(1.)*sp*0.9;
         o=vec4(col*a,a*0.92); }`);
     P.oilSpread = GLX.program(`in vec2 vUV; out vec4 o; uniform sampler2D uSrc; uniform vec2 uTx; uniform float uK;

@@ -513,7 +513,7 @@ const Effects = (() => {
       m.pin = { x: s.c.x + s.l.x, y: s.c.y + s.l.y }; },
     update(e, c, dt, time) { const s = e.s; const RM = Math.min(c.W, c.H) * 0.075;
       s.R = e.ending ? s.R : RM * ease(e.t / 0.5) * (1 + 0.08 * Math.sin(e.t * 9) * Math.exp(-e.t * 2));
-      s.wob = Math.max(0.35, s.wob - dt * 0.5) + (s.push || 0) * 0.02;
+      s.wob = Math.min(1, Math.max(0.35, s.wob - dt * 0.5) + Math.min(10, s.push || 0) * 0.01);
       if (!e.ending) { s.v.y += (-65 - s.v.y) * dt * 0.8; s.v.x = Math.sin(time * 0.7 + s.seed) * 45 + (s.push ? s.l.x * 0.5 : 0);
         s.c.x += s.v.x * dt; s.c.y += s.v.y * dt;
         if (s.c.y < s.R + 8) { s.c.y = s.R + 8; s.v.y = Math.abs(s.v.y) * 0.4; } s.c.x = clamp(s.c.x, s.R + 8, c.W - s.R - 8);

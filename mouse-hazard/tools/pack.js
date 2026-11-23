@@ -8,7 +8,7 @@ const pkg = require(path.join(ROOT, 'package.json'));
 const NAME = 'MOUSE HAZARD';
 const dir = path.join(outDir, NAME);
 fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true });
-if (process.platform === 'win32') cp.execSync(`powershell -NoProfile -Command "Expand-Archive -LiteralPath '${zipIn}' -DestinationPath '${dir}' -Force"`, { stdio: 'inherit' });
+if (process.platform === 'win32') cp.execSync(`tar -xf "${path.resolve(zipIn)}" -C "${dir}"`, { stdio: 'inherit' });
 else cp.execSync(`unzip -qo "${zipIn}" -d "${dir}"`);
 // only English language file (smaller)
 const loc = path.join(dir, 'locales'); fs.readdirSync(loc).forEach(f => { if (!/^en-US\.pak$/.test(f)) fs.rmSync(path.join(loc, f)); });
