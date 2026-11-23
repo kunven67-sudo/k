@@ -1,0 +1,541 @@
+{
+ "steps": [
+  {
+   "name": "setPos then getPos",
+   "pass": true,
+   "info": {
+    "x": 300,
+    "y": 200
+   }
+  },
+  {
+   "name": "clip keeps mouse in a box",
+   "pass": true,
+   "info": {
+    "p": {
+     "x": 149,
+     "y": 139
+    },
+    "c": {
+     "x": 100,
+     "y": 100,
+     "r": 150,
+     "b": 140
+    }
+   }
+  },
+  {
+   "name": "clip released",
+   "pass": true,
+   "info": {
+    "x": 0,
+    "y": 0,
+    "r": 1024,
+    "b": 768
+   }
+  },
+  {
+   "name": "captured their real cursor pictures",
+   "pass": true,
+   "info": {
+    "keys": [
+     "arrow",
+     "ibeam",
+     "wait",
+     "cross",
+     "up",
+     "nwse",
+     "nesw",
+     "we",
+     "ns",
+     "all",
+     "no",
+     "hand",
+     "appstarting"
+    ],
+    "arrow": [
+     32,
+     32,
+     0,
+     0,
+     125
+    ]
+   }
+  },
+  {
+   "name": "hide cursor",
+   "pass": true,
+   "info": {
+    "n": 13,
+    "before": {
+     "shown": false,
+     "handle": 0
+    }
+   }
+  },
+  {
+   "name": "cursor comes back after restore",
+   "pass": true,
+   "info": {
+    "solid": 125,
+    "solid2": 125
+   }
+  },
+  {
+   "name": "effect forcefield",
+   "pass": false,
+   "info": {
+    "clipDuring": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "clipAfter": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "hiddenSeen": false,
+    "overlayShownAfter": false,
+    "cursorHiddenAfter": false,
+    "ms": 2001
+   }
+  },
+  {
+   "name": "effect freeze",
+   "pass": false,
+   "info": {
+    "clipDuring": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "clipAfter": {
+     "x": 920,
+     "y": 500,
+     "r": 1000,
+     "b": 580
+    },
+    "hiddenSeen": true,
+    "overlayShownAfter": true,
+    "cursorHiddenAfter": true,
+    "ms": 11110
+   }
+  },
+  {
+   "name": "effect fire",
+   "pass": true,
+   "info": {
+    "clipDuring": {
+     "x": 920,
+     "y": 500,
+     "r": 1000,
+     "b": 580
+    },
+    "clipAfter": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "hiddenSeen": true,
+    "overlayShownAfter": true,
+    "cursorHiddenAfter": false,
+    "ms": 11206
+   }
+  },
+  {
+   "name": "effect water",
+   "pass": true,
+   "info": {
+    "clipDuring": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "clipAfter": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "hiddenSeen": true,
+    "overlayShownAfter": false,
+    "cursorHiddenAfter": false,
+    "ms": 10496
+   }
+  },
+  {
+   "name": "effect blackhole",
+   "pass": true,
+   "info": {
+    "clipDuring": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "clipAfter": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "hiddenSeen": true,
+    "overlayShownAfter": false,
+    "cursorHiddenAfter": false,
+    "ms": 8532
+   }
+  },
+  {
+   "name": "effect airstrike",
+   "pass": true,
+   "info": {
+    "clipDuring": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "clipAfter": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "hiddenSeen": true,
+    "overlayShownAfter": true,
+    "cursorHiddenAfter": false,
+    "ms": 11419
+   }
+  },
+  {
+   "name": "effect lightning",
+   "pass": true,
+   "info": {
+    "clipDuring": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "clipAfter": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "hiddenSeen": true,
+    "overlayShownAfter": false,
+    "cursorHiddenAfter": false,
+    "ms": 6303
+   }
+  },
+  {
+   "name": "effect tornado",
+   "pass": true,
+   "info": {
+    "clipDuring": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "clipAfter": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "hiddenSeen": true,
+    "overlayShownAfter": true,
+    "cursorHiddenAfter": false,
+    "ms": 17290
+   }
+  },
+  {
+   "name": "effect earthquake",
+   "pass": true,
+   "info": {
+    "clipDuring": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "clipAfter": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "hiddenSeen": true,
+    "overlayShownAfter": false,
+    "cursorHiddenAfter": false,
+    "ms": 6790
+   }
+  },
+  {
+   "name": "effect gravity",
+   "pass": true,
+   "info": {
+    "clipDuring": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "clipAfter": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "hiddenSeen": true,
+    "overlayShownAfter": false,
+    "cursorHiddenAfter": false,
+    "ms": 3081
+   }
+  },
+  {
+   "name": "effect oil",
+   "pass": true,
+   "info": {
+    "clipDuring": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "clipAfter": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "hiddenSeen": true,
+    "overlayShownAfter": false,
+    "cursorHiddenAfter": false,
+    "ms": 11061
+   }
+  },
+  {
+   "name": "effect honey",
+   "pass": true,
+   "info": {
+    "clipDuring": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "clipAfter": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "hiddenSeen": true,
+    "overlayShownAfter": false,
+    "cursorHiddenAfter": false,
+    "ms": 10708
+   }
+  },
+  {
+   "name": "effect lava",
+   "pass": true,
+   "info": {
+    "clipDuring": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "clipAfter": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "hiddenSeen": true,
+    "overlayShownAfter": true,
+    "cursorHiddenAfter": false,
+    "ms": 11102
+   }
+  },
+  {
+   "name": "effect blizzard",
+   "pass": true,
+   "info": {
+    "clipDuring": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "clipAfter": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "hiddenSeen": true,
+    "overlayShownAfter": false,
+    "cursorHiddenAfter": false,
+    "ms": 10914
+   }
+  },
+  {
+   "name": "effect drunk",
+   "pass": true,
+   "info": {
+    "clipDuring": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "clipAfter": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "hiddenSeen": true,
+    "overlayShownAfter": false,
+    "cursorHiddenAfter": false,
+    "ms": 6696
+   }
+  },
+  {
+   "name": "effect glitch",
+   "pass": true,
+   "info": {
+    "clipDuring": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "clipAfter": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "hiddenSeen": true,
+    "overlayShownAfter": false,
+    "cursorHiddenAfter": false,
+    "ms": 3741
+   }
+  },
+  {
+   "name": "effect clones",
+   "pass": true,
+   "info": {
+    "clipDuring": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "clipAfter": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "hiddenSeen": true,
+    "overlayShownAfter": false,
+    "cursorHiddenAfter": false,
+    "ms": 3590
+   }
+  },
+  {
+   "name": "effect mirror",
+   "pass": true,
+   "info": {
+    "clipDuring": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "clipAfter": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "hiddenSeen": true,
+    "overlayShownAfter": false,
+    "cursorHiddenAfter": false,
+    "ms": 4640
+   }
+  },
+  {
+   "name": "effect rubberband",
+   "pass": true,
+   "info": {
+    "clipDuring": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "clipAfter": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "hiddenSeen": true,
+    "overlayShownAfter": false,
+    "cursorHiddenAfter": false,
+    "ms": 4276
+   }
+  },
+  {
+   "name": "effect bubble",
+   "pass": true,
+   "info": {
+    "clipDuring": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "clipAfter": {
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
+    },
+    "hiddenSeen": true,
+    "overlayShownAfter": false,
+    "cursorHiddenAfter": false,
+    "ms": 10914
+   }
+  }
+ ],
+ "errors": [],
+ "display": {
+  "bounds": {
+   "x": 0,
+   "y": 0,
+   "width": 1024,
+   "height": 768
+  },
+  "workArea": {
+   "x": 0,
+   "y": 0,
+   "width": 1024,
+   "height": 720
+  },
+  "scale": 1
+ }
+}
