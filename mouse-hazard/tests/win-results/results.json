@@ -83,13 +83,14 @@
   },
   {
    "name": "effect forcefield",
-   "pass": false,
+   "pass": true,
    "info": {
+    "startMs": 3671,
     "clipDuring": {
-     "x": 0,
-     "y": 0,
-     "r": 1024,
-     "b": 768
+     "x": 387,
+     "y": 259,
+     "r": 637,
+     "b": 509
     },
     "clipAfter": {
      "x": 0,
@@ -97,43 +98,45 @@
      "r": 1024,
      "b": 768
     },
-    "hiddenSeen": false,
+    "hiddenSeen": true,
     "overlayShownAfter": false,
     "cursorHiddenAfter": false,
-    "ms": 2001
+    "ms": 3824
    }
   },
   {
    "name": "effect freeze",
-   "pass": false,
+   "pass": true,
    "info": {
+    "startMs": 83,
     "clipDuring": {
+     "x": 421,
+     "y": 306,
+     "r": 501,
+     "b": 386
+    },
+    "clipAfter": {
      "x": 0,
      "y": 0,
      "r": 1024,
      "b": 768
     },
-    "clipAfter": {
-     "x": 920,
-     "y": 500,
-     "r": 1000,
-     "b": 580
-    },
     "hiddenSeen": true,
     "overlayShownAfter": true,
-    "cursorHiddenAfter": true,
-    "ms": 11110
+    "cursorHiddenAfter": false,
+    "ms": 18082
    }
   },
   {
    "name": "effect fire",
    "pass": true,
    "info": {
+    "startMs": 281,
     "clipDuring": {
-     "x": 920,
-     "y": 500,
-     "r": 1000,
-     "b": 580
+     "x": 0,
+     "y": 0,
+     "r": 1024,
+     "b": 768
     },
     "clipAfter": {
      "x": 0,
@@ -142,15 +145,16 @@
      "b": 768
     },
     "hiddenSeen": true,
-    "overlayShownAfter": true,
+    "overlayShownAfter": false,
     "cursorHiddenAfter": false,
-    "ms": 11206
+    "ms": 7183
    }
   },
   {
    "name": "effect water",
    "pass": true,
    "info": {
+    "startMs": 3180,
     "clipDuring": {
      "x": 0,
      "y": 0,
@@ -166,13 +170,14 @@
     "hiddenSeen": true,
     "overlayShownAfter": false,
     "cursorHiddenAfter": false,
-    "ms": 10496
+    "ms": 10868
    }
   },
   {
    "name": "effect blackhole",
    "pass": true,
    "info": {
+    "startMs": 104,
     "clipDuring": {
      "x": 0,
      "y": 0,
@@ -188,13 +193,14 @@
     "hiddenSeen": true,
     "overlayShownAfter": false,
     "cursorHiddenAfter": false,
-    "ms": 8532
+    "ms": 4736
    }
   },
   {
    "name": "effect airstrike",
    "pass": true,
    "info": {
+    "startMs": 110,
     "clipDuring": {
      "x": 0,
      "y": 0,
@@ -208,15 +214,16 @@
      "b": 768
     },
     "hiddenSeen": true,
-    "overlayShownAfter": true,
+    "overlayShownAfter": false,
     "cursorHiddenAfter": false,
-    "ms": 11419
+    "ms": 9981
    }
   },
   {
    "name": "effect lightning",
    "pass": true,
    "info": {
+    "startMs": 240,
     "clipDuring": {
      "x": 0,
      "y": 0,
@@ -232,13 +239,14 @@
     "hiddenSeen": true,
     "overlayShownAfter": false,
     "cursorHiddenAfter": false,
-    "ms": 6303
+    "ms": 4351
    }
   },
   {
    "name": "effect tornado",
    "pass": true,
    "info": {
+    "startMs": 102,
     "clipDuring": {
      "x": 0,
      "y": 0,
@@ -252,15 +260,16 @@
      "b": 768
     },
     "hiddenSeen": true,
-    "overlayShownAfter": true,
+    "overlayShownAfter": false,
     "cursorHiddenAfter": false,
-    "ms": 17290
+    "ms": 7594
    }
   },
   {
    "name": "effect earthquake",
    "pass": true,
    "info": {
+    "startMs": 131,
     "clipDuring": {
      "x": 0,
      "y": 0,
@@ -276,13 +285,14 @@
     "hiddenSeen": true,
     "overlayShownAfter": false,
     "cursorHiddenAfter": false,
-    "ms": 6790
+    "ms": 6096
    }
   },
   {
    "name": "effect gravity",
    "pass": true,
    "info": {
+    "startMs": 127,
     "clipDuring": {
      "x": 0,
      "y": 0,
@@ -298,13 +308,14 @@
     "hiddenSeen": true,
     "overlayShownAfter": false,
     "cursorHiddenAfter": false,
-    "ms": 3081
+    "ms": 2985
    }
   },
   {
    "name": "effect oil",
    "pass": true,
    "info": {
+    "startMs": 101,
     "clipDuring": {
      "x": 0,
      "y": 0,
@@ -320,13 +331,14 @@
     "hiddenSeen": true,
     "overlayShownAfter": false,
     "cursorHiddenAfter": false,
-    "ms": 11061
+    "ms": 6070
    }
   },
   {
    "name": "effect honey",
    "pass": true,
    "info": {
+    "startMs": 115,
     "clipDuring": {
      "x": 0,
      "y": 0,
@@ -342,13 +354,14 @@
     "hiddenSeen": true,
     "overlayShownAfter": false,
     "cursorHiddenAfter": false,
-    "ms": 10708
+    "ms": 10490
    }
   },
   {
    "name": "effect lava",
    "pass": true,
    "info": {
+    "startMs": 652,
     "clipDuring": {
      "x": 0,
      "y": 0,
@@ -362,15 +375,16 @@
      "b": 768
     },
     "hiddenSeen": true,
-    "overlayShownAfter": true,
+    "overlayShownAfter": false,
     "cursorHiddenAfter": false,
-    "ms": 11102
+    "ms": 10112
    }
   },
   {
    "name": "effect blizzard",
    "pass": true,
    "info": {
+    "startMs": 108,
     "clipDuring": {
      "x": 0,
      "y": 0,
@@ -386,13 +400,14 @@
     "hiddenSeen": true,
     "overlayShownAfter": false,
     "cursorHiddenAfter": false,
-    "ms": 10914
+    "ms": 10553
    }
   },
   {
    "name": "effect drunk",
    "pass": true,
    "info": {
+    "startMs": 106,
     "clipDuring": {
      "x": 0,
      "y": 0,
@@ -408,13 +423,14 @@
     "hiddenSeen": true,
     "overlayShownAfter": false,
     "cursorHiddenAfter": false,
-    "ms": 6696
+    "ms": 4522
    }
   },
   {
    "name": "effect glitch",
    "pass": true,
    "info": {
+    "startMs": 113,
     "clipDuring": {
      "x": 0,
      "y": 0,
@@ -430,13 +446,14 @@
     "hiddenSeen": true,
     "overlayShownAfter": false,
     "cursorHiddenAfter": false,
-    "ms": 3741
+    "ms": 3195
    }
   },
   {
    "name": "effect clones",
    "pass": true,
    "info": {
+    "startMs": 118,
     "clipDuring": {
      "x": 0,
      "y": 0,
@@ -452,13 +469,14 @@
     "hiddenSeen": true,
     "overlayShownAfter": false,
     "cursorHiddenAfter": false,
-    "ms": 3590
+    "ms": 3527
    }
   },
   {
    "name": "effect mirror",
    "pass": true,
    "info": {
+    "startMs": 130,
     "clipDuring": {
      "x": 0,
      "y": 0,
@@ -474,13 +492,14 @@
     "hiddenSeen": true,
     "overlayShownAfter": false,
     "cursorHiddenAfter": false,
-    "ms": 4640
+    "ms": 3490
    }
   },
   {
    "name": "effect rubberband",
    "pass": true,
    "info": {
+    "startMs": 91,
     "clipDuring": {
      "x": 0,
      "y": 0,
@@ -496,13 +515,14 @@
     "hiddenSeen": true,
     "overlayShownAfter": false,
     "cursorHiddenAfter": false,
-    "ms": 4276
+    "ms": 4045
    }
   },
   {
    "name": "effect bubble",
    "pass": true,
    "info": {
+    "startMs": 108,
     "clipDuring": {
      "x": 0,
      "y": 0,
@@ -518,7 +538,7 @@
     "hiddenSeen": true,
     "overlayShownAfter": false,
     "cursorHiddenAfter": false,
-    "ms": 10914
+    "ms": 10855
    }
   }
  ],
