@@ -1,0 +1,147 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>MOUSE HAZARD</title>
+<style>
+@font-face { font-family: 'BC'; src: url('assets/fonts/BarlowCondensed-SemiBold.ttf'); font-weight: 600; }
+@font-face { font-family: 'BC'; src: url('assets/fonts/BarlowCondensed-Bold.ttf'); font-weight: 700; }
+@font-face { font-family: 'BC'; src: url('assets/fonts/BarlowCondensed-Medium.ttf'); font-weight: 500; }
+@font-face { font-family: 'B'; src: url('assets/fonts/Barlow-Regular.ttf'); font-weight: 400; }
+@font-face { font-family: 'B'; src: url('assets/fonts/Barlow-Medium.ttf'); font-weight: 500; }
+@font-face { font-family: 'Seg'; src: url('assets/fonts/DSEG7Classic-Bold.woff2'); }
+:root { --bg: #0a0c0e; --panel: #12161a; --panel2: #171c21; --line: #262d34; --text: #d9dee3; --dim: #7d8892; --haz: #f2c230; --red: #e0392b; --led: #ffae1a; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: 'B', 'Segoe UI', sans-serif; overflow: hidden; user-select: none; }
+body { display: grid; grid-template-rows: 38px 10px 1fr; }
+.title { -webkit-app-region: drag; display: flex; align-items: center; padding-left: 16px; gap: 12px; background: #07090a; }
+.title .mark { font: 700 17px 'BC'; letter-spacing: 3px; color: var(--haz); }
+.title .sub { font: 500 13px 'BC'; letter-spacing: 2px; color: var(--dim); text-transform: uppercase; }
+.title .sp { flex: 1; }
+.title button { -webkit-app-region: no-drag; width: 46px; height: 38px; border: 0; background: transparent; color: var(--dim); font: 18px 'B'; cursor: pointer; }
+.title button:hover { background: #1b2026; color: #fff; } .title button.x:hover { background: var(--red); }
+.stripe { background: repeating-linear-gradient(-45deg, var(--haz) 0 14px, #111 14px 28px); box-shadow: inset 0 -2px 0 rgba(0,0,0,.5); }
+main { display: grid; grid-template-columns: 300px 1fr; min-height: 0; }
+aside { background: linear-gradient(#101317, #0c0f12); border-right: 1px solid var(--line); padding: 18px 18px 14px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+.lbl { font: 600 12px 'BC'; letter-spacing: 2.5px; color: var(--dim); text-transform: uppercase; margin-bottom: 8px; display: flex; justify-content: space-between; }
+.lcd { position: relative; background: #050505; border: 1px solid #000; border-radius: 6px; box-shadow: inset 0 2px 10px rgba(0,0,0,.9), 0 1px 0 #20262c; padding: 14px 16px 10px; text-align: right; }
+.lcd .ghost, .lcd .val { font-family: 'Seg'; font-size: 62px; line-height: 1; letter-spacing: 4px; }
+.lcd .ghost { position: absolute; right: 16px; top: 14px; color: #1d1608; }
+.lcd .val { position: relative; color: var(--led); text-shadow: 0 0 10px rgba(255,160,20,.65), 0 0 24px rgba(255,120,0,.35); }
+.lcd .unit { font: 600 12px 'BC'; letter-spacing: 3px; color: #7a5a18; margin-top: 6px; }
+.row { display: flex; gap: 6px; }
+.btn { flex: 1; height: 34px; border-radius: 5px; border: 1px solid #2c343c; background: linear-gradient(#20262c, #171b20); color: var(--text); font: 600 15px 'BC'; letter-spacing: 1px; cursor: pointer; box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 2px 4px rgba(0,0,0,.4); }
+.btn:hover { border-color: #46515c; color: #fff; } .btn:active { transform: translateY(1px); }
+.btn.on { border-color: var(--led); color: var(--led); }
+input[type=range] { -webkit-appearance: none; width: 100%; height: 26px; background: transparent; margin: 4px 0 0; }
+input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--led) var(--p, 50%), #1e242a var(--p, 50%)); box-shadow: inset 0 1px 2px rgba(0,0,0,.8); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 26px; margin-top: -10px; border-radius: 3px; background: linear-gradient(#e7eaee, #9aa3ab); border: 1px solid #000; box-shadow: 0 2px 5px rgba(0,0,0,.6); cursor: pointer; }
+.toggle { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); cursor: pointer; }
+.toggle .t { font: 600 15px 'BC'; letter-spacing: 1px; } .toggle .d { font-size: 12px; color: var(--dim); margin-top: 2px; }
+.sw { width: 44px; height: 24px; border-radius: 12px; background: #252b31; position: relative; flex: none; box-shadow: inset 0 1px 3px rgba(0,0,0,.8); transition: background .15s; }
+.sw::after { content: ''; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%; background: #9aa3ab; transition: left .15s, background .15s; }
+.toggle.on .sw { background: #3d2c06; } .toggle.on .sw::after { left: 23px; background: var(--led); box-shadow: 0 0 8px var(--led); }
+.stop { margin-top: auto; height: 74px; border-radius: 10px; border: 2px solid #4a0d08; background: radial-gradient(circle at 50% 35%, #ff5a47, #c1271b 55%, #7d140c); color: #fff; font: 700 26px 'BC'; letter-spacing: 4px; text-shadow: 0 2px 2px rgba(0,0,0,.5); cursor: pointer; box-shadow: 0 6px 0 #4a0d08, 0 10px 20px rgba(0,0,0,.6), inset 0 2px 0 rgba(255,255,255,.25); }
+.stop:active { transform: translateY(4px); box-shadow: 0 2px 0 #4a0d08, 0 4px 10px rgba(0,0,0,.6), inset 0 2px 0 rgba(255,255,255,.25); }
+.note { font-size: 12px; line-height: 1.5; color: var(--dim); } .note b { color: var(--text); font-weight: 500; }
+section { overflow-y: auto; padding: 18px 20px 24px; }
+.head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 14px; }
+.head h1 { margin: 0; font: 700 30px 'BC'; letter-spacing: 2px; } .head span { color: var(--dim); font-size: 14px; }
+.head .rand { margin-left: auto; flex: none; width: 150px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(206px, 1fr)); gap: 12px; }
+.card { position: relative; border-radius: 8px; overflow: hidden; background: var(--panel); border: 1px solid var(--line); cursor: pointer; transition: transform .12s, border-color .12s, box-shadow .12s; }
+.card:hover { transform: translateY(-2px); border-color: #4b5560; box-shadow: 0 8px 22px rgba(0,0,0,.55); }
+.card:active { transform: translateY(0); }
+.card .pic { aspect-ratio: 16 / 9; background: #15191d center / cover no-repeat; position: relative; }
+.card .pic::after { content: ''; position: absolute; inset: 0; background: linear-gradient(transparent 55%, rgba(10,12,14,.9)); }
+.card .num { position: absolute; left: 8px; top: 7px; font: 700 13px 'BC'; color: rgba(255,255,255,.85); background: rgba(0,0,0,.55); padding: 1px 6px; border-radius: 3px; letter-spacing: 1px; z-index: 1; }
+.card .tag { position: absolute; right: 8px; top: 7px; font: 700 11px 'BC'; letter-spacing: 1.5px; padding: 2px 7px; border-radius: 3px; z-index: 1; color: #111; background: var(--haz); }
+.tag.FORCE { background: #7cc4ff; } .tag.ELEMENT { background: #ff8a4c; } .tag.TRAP { background: var(--haz); } .tag.CONTROL { background: #b5e48c; } .tag.TRICK { background: #d0a6ff; } .tag.BOOM { background: #ff5a47; }
+.card .txt { padding: 8px 11px 11px; } .card .name { font: 700 19px 'BC'; letter-spacing: .5px; } .card .desc { font-size: 12.5px; color: var(--dim); line-height: 1.35; margin-top: 2px; min-height: 34px; }
+.card .bar { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--led); box-shadow: 0 0 8px var(--led); }
+.card.run { border-color: var(--led); box-shadow: 0 0 0 1px var(--led), 0 0 22px rgba(255,170,30,.25); }
+.card.run::before { content: 'ACTIVE'; position: absolute; left: 50%; top: 28%; transform: translate(-50%, -50%); font: 700 22px 'BC'; letter-spacing: 6px; color: var(--led); text-shadow: 0 0 12px rgba(255,160,20,.9); z-index: 2; }
+::-webkit-scrollbar { width: 10px; } ::-webkit-scrollbar-thumb { background: #232a31; border-radius: 5px; border: 2px solid var(--bg); }
+</style></head>
+<body>
+<div class="title"><span class="mark">MOUSE HAZARD</span><span class="sub">containment console</span><span class="sp"></span><button id="min" title="Minimize">&#8211;</button><button id="close" class="x" title="Close">&#10005;</button></div>
+<div class="stripe"></div>
+<main>
+  <aside>
+    <div>
+      <div class="lbl"><span>Seconds</span><span id="secHint">1 to 120</span></div>
+      <div class="lcd"><div class="ghost">888</div><div class="val" id="secVal">5</div><div class="unit">SECONDS STUCK</div></div>
+      <input type="range" id="sec" min="1" max="120" step="1" value="5">
+      <div class="row"><button class="btn" data-s="-1">-1</button><button class="btn" data-p="3">3</button><button class="btn" data-p="5">5</button><button class="btn" data-p="10">10</button><button class="btn" data-p="30">30</button><button class="btn" data-s="1">+1</button></div>
+    </div>
+    <div class="toggle" id="stack"><div><div class="t">Stack effects</div><div class="d">Run more than one at once</div></div><div class="sw"></div></div>
+    <div>
+      <div class="lbl"><span>Sound</span><span id="volVal">80%</span></div>
+      <input type="range" id="vol" min="0" max="100" step="1" value="80">
+    </div>
+    <div class="note"><b>Panic key:</b> Ctrl + Shift + F12 stops everything.<br><b>Ctrl + Alt + Delete</b> always frees the mouse too (Windows never lets an app block it).</div>
+    <button class="stop" id="stop">STOP ALL</button>
+  </aside>
+  <section>
+    <div class="head"><h1>CHOOSE YOUR HAZARD</h1><span id="count">20 hazards</span><button class="btn rand" id="rand">RANDOM</button></div>
+    <div class="grid" id="grid"></div>
+  </section>
+</main>
+<script>
+const { ipcRenderer } = require('electron');
+const fs = require('fs'), path = require('path');
+const LIST = [
+  ['forcefield', 'Force Field', 'TRAP', 'Locked in an energy box in the middle of the screen.'],
+  ['freeze', 'Deep Freeze', 'TRAP', 'Frozen solid in a block of ice. Then it shatters.'],
+  ['fire', 'On Fire', 'ELEMENT', 'Real flames, embers and smoke. The cursor burns black.'],
+  ['water', 'Water Bucket', 'ELEMENT', 'Soaked. It drips, splashes and puddles on the taskbar.'],
+  ['blackhole', 'Black Hole', 'FORCE', 'Sucks your cursor in and bends the whole screen.'],
+  ['airstrike', 'Airstrike', 'BOOM', 'Laser lock, falling bomb, fireball. The cursor gets launched.'],
+  ['lightning', 'Lightning', 'ELEMENT', 'Storm clouds. Bolts hit your cursor and shock it.'],
+  ['tornado', 'Tornado', 'FORCE', 'A dust funnel grabs your cursor and spins it around.'],
+  ['earthquake', 'Earthquake', 'FORCE', 'The whole screen shakes and the glass cracks.'],
+  ['gravity', 'Gravity', 'FORCE', 'Drops onto the taskbar and bounces. Flick up to throw it.'],
+  ['oil', 'Oil Slick', 'CONTROL', 'Rainbow oil everywhere. The cursor slides and will not stop.'],
+  ['honey', 'Honey Trap', 'CONTROL', 'Thick honey pours on it. Everything gets slow and sticky.'],
+  ['lava', 'Lava Melt', 'ELEMENT', 'Glows red hot and melts into dripping lava.'],
+  ['blizzard', 'Blizzard', 'ELEMENT', 'Snow storm. Snow piles up on the cursor and weighs it down.'],
+  ['drunk', 'Drunk', 'CONTROL', 'Double vision, a swaying screen and hiccups.'],
+  ['glitch', 'Glitch', 'CONTROL', 'The screen corrupts and the cursor teleports around.'],
+  ['clones', 'Clone Army', 'TRICK', '30 cursors move exactly like yours. Find the real one.'],
+  ['mirror', 'Mirror World', 'TRICK', 'The screen flips. Left is right. Then up is down.'],
+  ['rubberband', 'Rubber Band', 'TRAP', 'Pinned to a rubber band that pulls you back, then snaps.'],
+  ['bubble', 'Soap Bubble', 'TRAP', 'Trapped in a soap bubble that floats up and pops.'],
+];
+let S = { seconds: 5, volume: 0.8, stack: true };
+const $ = id => document.getElementById(id);
+const grid = $('grid');
+LIST.forEach(([id, name, tag, desc], i) => {
+  const c = document.createElement('div'); c.className = 'card'; c.dataset.id = id;
+  const pic = path.join(__dirname, 'assets', 'previews', id + '.jpg');
+  const bg = fs.existsSync(pic) ? `background-image:url('assets/previews/${id}.jpg')` : '';
+  c.innerHTML = `<div class="pic" style="${bg}"><span class="num">${String(i + 1).padStart(2, '0')}</span><span class="tag ${tag}">${tag}</span></div><div class="txt"><div class="name">${name}</div><div class="desc">${desc}</div></div><div class="bar"></div>`;
+  c.onclick = () => ipcRenderer.send('start', { id, seconds: S.seconds });
+  grid.appendChild(c);
+});
+function paintRange(el) { el.style.setProperty('--p', ((el.value - el.min) / (el.max - el.min) * 100) + '%'); }
+function show() {
+  $('sec').value = S.seconds; $('secVal').textContent = S.seconds; paintRange($('sec'));
+  $('vol').value = Math.round(S.volume * 100); $('volVal').textContent = Math.round(S.volume * 100) + '%'; paintRange($('vol'));
+  $('stack').classList.toggle('on', !!S.stack);
+  document.querySelectorAll('[data-p]').forEach(b => b.classList.toggle('on', +b.dataset.p === S.seconds));
+}
+function save() { ipcRenderer.send('settings', S); show(); }
+$('sec').oninput = e => { S.seconds = +e.target.value; save(); };
+$('vol').oninput = e => { S.volume = e.target.value / 100; save(); };
+document.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { S.seconds = +b.dataset.p; save(); });
+document.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { S.seconds = Math.max(1, Math.min(120, S.seconds + +b.dataset.s)); save(); });
+$('stack').onclick = () => { S.stack = !S.stack; save(); };
+$('stop').onclick = () => ipcRenderer.send('stop');
+$('rand').onclick = () => ipcRenderer.send('start', { id: LIST[Math.random() * LIST.length | 0][0], seconds: S.seconds });
+$('min').onclick = () => ipcRenderer.send('win', 'min'); $('close').onclick = () => ipcRenderer.send('win', 'close');
+ipcRenderer.invoke('get-settings').then(s => { S = Object.assign(S, s); show(); });
+ipcRenderer.on('effect-state', (e, list) => {
+  document.querySelectorAll('.card').forEach(c => { const r = list.find(x => x.id === c.dataset.id); c.classList.toggle('run', !!r);
+    c.querySelector('.bar').style.width = r ? (r.left / r.dur * 100) + '%' : '0'; });
+});
+ipcRenderer.on('stopped', () => document.querySelectorAll('.card').forEach(c => { c.classList.remove('run'); c.querySelector('.bar').style.width = '0'; }));
+show();
+</script>
+</body></html>

@@ -1,0 +1,23 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>MOUSE HAZARD overlay</title>
+<style>
+@font-face { font-family: 'Seg'; src: url('assets/fonts/DSEG7Classic-Bold.woff2'); }
+html, body { margin: 0; padding: 0; overflow: hidden; background: transparent; width: 100vw; height: 100vh; cursor: none; user-select: none; }
+#c { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; }
+#timer { position: fixed; display: none; transform: translate(-50%, 0); font-family: 'Seg', monospace; font-size: 22px; color: #bfe6ff;
+  text-shadow: 0 0 6px #4fb6ff, 0 0 16px #1f7fff, 0 1px 2px #000; letter-spacing: 2px; pointer-events: none; }
+</style></head>
+<body>
+<canvas id="c"></canvas>
+<div id="timer">5.0</div>
+<script>window.__MH_TEST = !!process.env.MH_TEST; if (window.__MH_TEST && process.env.MH_BG) { document.body.style.background = "url('" + process.env.MH_BG.replace(/\\/g, '/') + "') 0 0 / 100% 100%"; }</script>
+<script src="engine/gl.js"></script>
+<script src="engine/fluid.js"></script>
+<script src="engine/particles.js"></script>
+<script src="engine/liquid.js"></script>
+<script src="engine/render.js"></script>
+<script src="engine/shapes.js"></script>
+<script src="engine/audio.js"></script>
+<script src="effects.js"></script>
+<script src="overlay.js"></script>
+</body></html>

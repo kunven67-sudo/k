@@ -1,0 +1,33 @@
+Sounds: real recordings from freesound.org, all released under Creative Commons 0 (public domain).
+
+band_stretch.ogg  <-  freesound sound #429404 "Latex Gloves Box Pull Glove Out"  https://freesound.org/s/429404/
+beep.ogg  <-  freesound sound #151779 "Outtake Beep-1k.wav"  https://freesound.org/s/151779/
+blizzard.ogg  <-  freesound sound #331527 "Wind Howling thru window crack.mp3"  https://freesound.org/s/331527/
+bubble_pop.ogg  <-  freesound sound #447910 "Plop!"  https://freesound.org/s/447910/
+bubbles.ogg  <-  freesound sound #173439 "SFX_UnderWater"  https://freesound.org/s/173439/
+electric.ogg  <-  freesound sound #531421 "Electric Zap Loop"  https://freesound.org/s/531421/
+explosion.ogg  <-  freesound sound #235968 "Explosion_01.wav"  https://freesound.org/s/235968/
+field_hit.ogg  <-  freesound sound #136542 "ELECTRIC_ZAP_001.wav"  https://freesound.org/s/136542/
+field_hum.ogg  <-  freesound sound #452768 "Scifi_Generator_Lp"  https://freesound.org/s/452768/
+fire_ignite.ogg  <-  freesound sound #668375 "Blow Torch"  https://freesound.org/s/668375/
+fire_loop.ogg  <-  freesound sound #563765 "Fire Auto - car on fire"  https://freesound.org/s/563765/
+glass_crack.ogg  <-  freesound sound #212698 "Breaking a glass bottle"  https://freesound.org/s/212698/
+glitch.ogg  <-  freesound sound #534695 "TV glitch"  https://freesound.org/s/534695/
+hiccup.ogg  <-  freesound sound #250140 "Adult Male Hiccup"  https://freesound.org/s/250140/
+ice_crack.ogg  <-  freesound sound #418194 "Hard Glass Impact"  https://freesound.org/s/418194/
+ice_freeze.ogg  <-  freesound sound #452645 "ice grinding cracking freezing designed.wav"  https://freesound.org/s/452645/
+ice_shatter.ogg  <-  freesound sound #221528 "Glass Break"  https://freesound.org/s/221528/
+incoming.ogg  <-  freesound sound #398255 "Bomb Dropping.wav"  https://freesound.org/s/398255/
+lava.ogg  <-  freesound sound #385098 "Volcano.wav"  https://freesound.org/s/385098/
+pop.ogg  <-  freesound sound #202230 "Pop sound"  https://freesound.org/s/202230/
+rumble.ogg  <-  freesound sound #222521 "Cracking Earthquake (cracking soil, cracking stone)"  https://freesound.org/s/222521/
+shimmer.ogg  <-  freesound sound #844398 "Mysterious Sparkle Flourish"  https://freesound.org/s/844398/
+sizzle.ogg  <-  freesound sound #155660 "cig_extinguish.wav"  https://freesound.org/s/155660/
+squelch.ogg  <-  freesound sound #433840 "Slime 27.wav"  https://freesound.org/s/433840/
+steam.ogg  <-  freesound sound #365071 "Steam.wav"  https://freesound.org/s/365071/
+thud.ogg  <-  freesound sound #504626 "BODY FALL - V HVY - DIRT"  https://freesound.org/s/504626/
+thunder.ogg  <-  freesound sound #840628 "Closeup Thunder Strike 01"  https://freesound.org/s/840628/
+water_drip.ogg  <-  freesound sound #174718 "Single Water Drop"  https://freesound.org/s/174718/
+water_pour.ogg  <-  freesound sound #173930 "Water Pour"  https://freesound.org/s/173930/
+water_splash.ogg  <-  freesound sound #9508 "SPLASH.wav"  https://freesound.org/s/9508/
+whoosh.ogg  <-  freesound sound #60013 "Whoosh"  https://freesound.org/s/60013/

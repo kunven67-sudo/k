@@ -1,0 +1,51 @@
+name: MOUSE HAZARD Windows check
+on:
+  push:
+    branches: [claude/sweet-mccarthy-8pwn26]
+    paths: ['mouse-hazard/**', '.github/workflows/mouse-hazard-windows.yml', '!mouse-hazard/tests/win-results/**']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: mouse-hazard
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install
+        run: |
+          $env:ELECTRON_SKIP_BINARY_DOWNLOAD = "1"
+          npm ci --no-audit --no-fund
+          Invoke-WebRequest https://github.com/electron/electron/releases/download/v44.6.0/electron-v44.6.0-win32-x64.zip -OutFile electron-win.zip
+      - name: Build the app folder
+        run: node tools/pack.js electron-win.zip dist
+      - name: Run every effect on the real Windows screen
+        run: |
+          New-Item -ItemType Directory -Force tests/win-results | Out-Null
+          $env:MH_TEST = "$PWD\tests\wintest.js"; $env:MH_OUT = "$PWD\tests\win-results"
+          $p = Start-Process -FilePath "dist\MOUSE HAZARD\MOUSE HAZARD.exe" -PassThru
+          Wait-Process -Id $p.Id -Timeout 420
+          Get-Content tests/win-results/results.json
+      - name: Crash check (guard frees the mouse)
+        run: |
+          $env:MH_TEST = "$PWD\tests\crashtest.js"
+          Start-Process -FilePath "dist\MOUSE HAZARD\MOUSE HAZARD.exe"
+          Start-Sleep -Seconds 9
+          Remove-Item Env:MH_TEST
+          node tests/check-free.js | Tee-Object -FilePath tests/win-results/crash.json
+      - name: Save results to the branch
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f tests/win-results
+          git commit -m "MOUSE HAZARD Windows check results" 2>$null
+          git pull --rebase
+          git push

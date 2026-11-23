@@ -1,0 +1,16 @@
+{
+  "name": "mouse-hazard",
+  "version": "1.0.0",
+  "description": "Do terrible things to your mouse",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "koffi": "2.16.4"
+  },
+  "devDependencies": {
+    "electron": "44.6.0",
+    "resedit": "^2.0.3"
+  }
+}
