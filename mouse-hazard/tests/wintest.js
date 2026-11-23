@@ -28,15 +28,17 @@ module.exports = async ({ app, getOverlay, startEffect, stopAll, W, state }) => 
     for (const id of IDS) {
       const cx = Math.round(d.bounds.width * 0.45), cy = Math.round(d.bounds.height * 0.45);
       W.setPos(cx, cy); await wait(150);
-      startEffect(id, 2.4);
+      const tStart = Date.now(); startEffect(id, 2.4);
+      while (!state().cursorHidden && Date.now() - tStart < 20000) await wait(20); // first one also starts the graphics
+      const startMs = Date.now() - tStart;
       // move like a person would during the effect
-      const t0 = Date.now(); let k = 0, clipSeen = null, hiddenSeen = false;
+      const t0 = Date.now(); let k = 0, clipSeen = null, hiddenSeen = false, shotDone = false;
       while (Date.now() - t0 < 2000) { const q = W.getPos(); W.setPos(q.x + Math.round(Math.sin(k / 3) * 9), q.y + Math.round(Math.cos(k / 4) * 6)); k++; await wait(16);
-        if (Date.now() - t0 > 900 && !clipSeen) clipSeen = W.getClip(); if (state().cursorHidden) hiddenSeen = true;
-        if (k === 75) await shot(id); }
-      const done = Date.now(); while (state().overlayShown && Date.now() - done < 9000) await wait(100);
+        if (Date.now() - t0 > 700 && !clipSeen) clipSeen = W.getClip(); if (state().cursorHidden) hiddenSeen = true;
+        if (!shotDone && Date.now() - t0 > 1100) { shotDone = true; await shot(id); } }
+      const done = Date.now(); while ((state().overlayShown || state().cursorHidden) && Date.now() - done < 12000) await wait(100);
       const after = W.getClip(); const st = state();
-      const info = { clipDuring: clipSeen, clipAfter: after, hiddenSeen, overlayShownAfter: st.overlayShown, cursorHiddenAfter: st.cursorHidden, ms: Date.now() - t0 };
+      const info = { startMs, clipDuring: clipSeen, clipAfter: after, hiddenSeen, overlayShownAfter: st.overlayShown, cursorHiddenAfter: st.cursorHidden, ms: Date.now() - t0 };
       let pass = hiddenSeen && !st.cursorHidden && after.r - after.x >= d.bounds.width * 0.9;
       if (id === 'forcefield' || id === 'freeze') pass = pass && clipSeen && clipSeen.r - clipSeen.x < 400;
       ok('effect ' + id, pass, info);

@@ -106,13 +106,15 @@ function report() { ipcRenderer.send('effect-state', active.filter(e => !e.endin
 
 let rafOn = false, reportT = 0, simTime = 0;
 function frame(now) {
-  const dt = window.__MH_FIXED ? 1 / 60 : Math.min(0.05, Math.max(0.001, (now - lastT) / 1000)); lastT = now; simTime += dt;
+  const realDt = Math.min(0.25, Math.max(0.001, (now - lastT) / 1000)); // the clock: seconds stay real seconds even if a frame is slow
+  const dt = window.__MH_FIXED ? 1 / 60 : Math.min(0.05, realDt); lastT = now; simTime += dt;
+  const clk = window.__MH_FIXED ? dt : realDt;
   const time = now / 1000;
   try { mouseTick(dt); } catch (e) { console.error(e); }
   // update effects
   Render.resetScreen(); Parts.wind = 0;
   for (const e of active) {
-    if (!e.ending) { e.t += dt; if (e.t >= e.dur) endEffect(e); } else e.te += dt;
+    if (!e.ending) { e.t += clk; if (e.t >= e.dur) endEffect(e); } else e.te += clk;
     try { e.def.update && e.def.update(e, ctx, dt, time); } catch (err) { console.error(err); }
   }
   for (let i = active.length - 1; i >= 0; i--) { const e = active[i]; if (e.ending && e.te >= (e.def.outro == null ? 1 : e.def.outro)) {
@@ -161,7 +163,7 @@ ipcRenderer.on('screen', (ev, img) => { if (img && img.bgra) Render.setScreen(im
 ipcRenderer.on('start', (ev, m) => {
   if (m.display) setup(m.display);
   settings.stack = m.stack; if (m.volume != null) { settings.volume = m.volume; Sfx.init(m.volume); }
-  if (!active.length) { M.init = false; }
+  if (!active.length) { const lp = toLocal(Win.getPos()); M.virt = { x: lp.x, y: lp.y }; M.last = { x: lp.x, y: lp.y }; M.vel = { x: 0, y: 0 }; M.init = true; }
   startEffect(m.id, m.seconds);
 });
 ipcRenderer.on('stop', (ev, m) => {

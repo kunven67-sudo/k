@@ -30,6 +30,24 @@ const PLAN = [ // id, seconds, capture times
   ['rubberband', 5, [0.8, 5.1]], ['bubble', 5, [1.5, 5.05]],
 ];
 
+const PREVIEW = { // id: [seconds, time, crop [x,y,w,h] or null = whole screen, mouse path]
+  forcefield: [5, 1.3, [480, 270, 960, 540], 't => ({ x: 900 + t * 700, y: 520 + Math.sin(t * 3) * 200 })'],
+  freeze: [5, 1.6, [580, 290, 720, 405], 't => ({ x: 900 + Math.sin(t * 25) * 40, y: 480 })'],
+  fire: [6, 2.6, [620, 330, 640, 360], 't => ({ x: 940 + Math.sin(t) * 30, y: 620 })'],
+  water: [6, 0.75, [600, 160, 720, 405], 't => ({ x: 930, y: 470 })'],
+  blackhole: [6, 3.0, [600, 284, 720, 405], 't => ({ x: 600 + t * 40, y: 300 })'],
+  airstrike: [5, 3.3, [600, 300, 720, 405], 't => ({ x: 960, y: 560 })'],
+  lightning: [5, 0.6, [500, 60, 960, 540], 't => ({ x: 980, y: 560 })'],
+  tornado: [5, 2.6, null, null], earthquake: [5, 3.6, null, null],
+  gravity: [4, 0.34, [560, 300, 640, 360], 't => ({ x: 860, y: 300 })'],
+  oil: [5, 1.5, [520, 330, 720, 405], 't => ({ x: 800 + (t < 0.6 ? t * 500 : 300), y: 500 + (t < 0.6 ? t * 200 : 120) })'],
+  honey: [6, 1.3, [640, 80, 640, 360], 't => ({ x: 930, y: 420 })'],
+  lava: [6, 3.2, [620, 300, 640, 360], 't => ({ x: 920, y: 420 })'],
+  blizzard: [6, 5.5, null, 't => ({ x: 950, y: 330 })'], drunk: [5, 2.2, null, null], glitch: [5, 0.5, null, null],
+  clones: [4, 1.2, [480, 270, 960, 540], null], mirror: [6, 1.2, null, null],
+  rubberband: [5, 0.8, [760, 330, 800, 450], 't => ({ x: 900 + t * 600, y: 500 + t * 200 })'],
+  bubble: [5, 1.5, [680, 340, 480, 270], 't => ({ x: 900, y: 600 })'],
+};
 module.exports = async ({ app, getOverlay }) => {
   const errors = [];
   try {
@@ -48,19 +66,23 @@ module.exports = async ({ app, getOverlay }) => {
     console.log('bg', await ov.webContents.executeJavaScript('getComputedStyle(document.body).backgroundImage.slice(0,80) + " " + document.body.offsetWidth'));
     const only = (process.env.MH_ONLY || '').split(',').filter(Boolean);
     const display = { id: 1, phys: { x: 0, y: 0, width: 1920, height: 1080 }, floor: 1032, scale: 1 };
-    for (const [id, secs, times] of PLAN) {
+    const plan = process.env.MH_PREVIEW ? Object.keys(PREVIEW).map(k => [k, PREVIEW[k][0], [PREVIEW[k][1]]]) : PLAN;
+    for (const [id, secs, times] of plan) {
       if (only.length && !only.includes(id)) continue;
-      const p = PATHS[id] || PATHS.default;
+      const p = (process.env.MH_PREVIEW && PREVIEW[id][3]) || PATHS[id] || PATHS.default;
       await ov.webContents.executeJavaScript(`(() => { const path = ${p}; window.__MH_FIXED = 1; const t0 = MH.simTime; const tt = () => MH.simTime - t0;
         let last = path(0); const pos = { x: last.x, y: last.y };
         window.__fakeMouse = global.__fakeMouse = () => { const n = path(tt()); pos.x += n.x - last.x; pos.y += n.y - last.y; last = n; return { x: pos.x, y: pos.y }; };
         window.__fakeMouseSet = global.__fakeMouseSet = (x, y) => { pos.x = x; pos.y = y; }; MH.M.init = false; return 1; })()`);
+      await ov.webContents.executeJavaScript('window.__fakeMouse(); 1');
       ov.webContents.send('start', { id, seconds: secs, display, stack: true, volume: 0 });
       let k = 0;
       for (const t of times) {
         for (let g = 0; g < 4000; g++) { const et = await ov.webContents.executeJavaScript(`(() => { const e = MH.active.find(x => x.id === '${id}'); return e ? (e.ending ? e.dur + e.te : e.t) : 1e9; })()`); if (et >= t) break; await wait(15); }
-        const img = await ov.webContents.capturePage();
-        fs.writeFileSync(path.join(OUT, `${id}_${k++}.jpg`), img.toJPEG(88));
+        let img = await ov.webContents.capturePage();
+        if (process.env.MH_PREVIEW) { const cr = PREVIEW[id][2]; if (cr) img = img.crop({ x: cr[0], y: cr[1], width: cr[2], height: cr[3] });
+          fs.writeFileSync(path.join(__dirname, '..', 'assets', 'previews', id + '.jpg'), img.resize({ width: 480, height: 270, quality: 'best' }).toJPEG(86)); }
+        else fs.writeFileSync(path.join(OUT, `${id}_${k++}.jpg`), img.toJPEG(88));
       }
       ov.webContents.send('stop', { hard: true });
       await wait(700);

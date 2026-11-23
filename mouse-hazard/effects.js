@@ -343,7 +343,7 @@ const Effects = (() => {
   // 11 ─ OIL SLICK: rainbow oil everywhere, the cursor slides like crazy
   E.oil = {
     name: 'Oil Slick', outro: 3,
-    start(e, c) { const s = e.s; s.v = { x: 0, y: 0 }; s.stamps = []; for (let k = 0; k < 10; k++) s.stamps.push([cx(c) + R(-80, 80), cy(c) + R(-50, 80), R(80, 190), 1]);
+    start(e, c) { const s = e.s; s.v = { x: 0, y: 0 }; s.stamps = []; for (let k = 0; k < 12; k++) s.stamps.push([cx(c) + R(-90, 90), cy(c) + R(-50, 90), R(70, 180), R(0.45, 0.7)]);
       play('squelch', { vol: 0.9, rate: 0.7 }); s.sq = 0; },
     mouse(e, m, dt) { const s = e.s, c = MH.ctx;
       s.v.x += m.dx / dt * 0.1; s.v.y += m.dy / dt * 0.1; const f = Math.exp(-0.5 * dt); s.v.x *= f; s.v.y *= f;
@@ -352,7 +352,7 @@ const Effects = (() => {
       const nx = cx(c) + m.dx, ny = cy(c) + m.dy;
       if (nx < 2 || nx > c.W - 3) { s.v.x *= -0.55; m.dx = 0; } if (ny < 2 || ny > c.H - 3) { s.v.y *= -0.55; m.dy = 0; } },
     update(e, c, dt) { const s = e.s; const sp = Math.hypot(s.v.x, s.v.y);
-      if (!e.ending && sp > 60) s.stamps.push([cx(c) + 8, cy(c) + 10, 26 + Math.min(60, sp * 0.02), 0.65]);
+      if (!e.ending && sp > 60) s.stamps.push([cx(c) + 8, cy(c) + 10, 26 + Math.min(60, sp * 0.02), 0.42]);
       s.sq -= dt; if (sp > 1300 && s.sq <= 0) { s.sq = 0.5; play('squelch', { vol: 0.4, vary: 0.4, pan: c.pan(cx(c)) }); }
       s.fade = e.ending ? Math.max(0, 1 - e.te / 3) : 1; },
     cursor(e, look, lk) { lk.wet = Math.max(lk.wet || 0, 0.7 * e.s.fade); },
