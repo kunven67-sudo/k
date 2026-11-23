@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NIGHTREEL</title>
+<style>
+  :root { --bg: #0b0b0d; --panel: #16161a; --fg: #f2f2f3; --muted: #9a9aa3; --accent: #7cff3a; --red: #e0262f; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font-family: "Segoe UI", "Inter", system-ui, sans-serif; overflow-x: hidden; }
+  button { font: inherit; cursor: pointer; }
+  /* ---------- top bar ---------- */
+  header { position: fixed; inset: 0 0 auto; height: 68px; display: flex; align-items: center; gap: 34px; padding: 0 48px; z-index: 5;
+    background: linear-gradient(#000c, #0000); }
+  .logo { font-weight: 900; font-size: 30px; letter-spacing: 3px; color: var(--red); text-shadow: 0 2px 0 #0008; }
+  .logo span { color: #fff; }
+  nav { display: flex; gap: 22px; font-size: 15px; color: #ddd; } nav b { color: #fff; }
+  /* ---------- hero ---------- */
+  .hero { position: relative; height: 86vh; min-height: 520px; background: #000 center/cover no-repeat; display: flex; align-items: flex-end; }
+  .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, #000e 0%, #0008 38%, #0000 70%), linear-gradient(0deg, var(--bg) 0%, #0000 30%); }
+  .hero .info { position: relative; z-index: 1; padding: 0 48px 120px; max-width: 640px; }
+  .badge { display: inline-flex; gap: 8px; align-items: center; font-size: 14px; font-weight: 700; letter-spacing: 2px; color: #ddd; }
+  .badge i { font-style: normal; background: var(--red); color: #fff; padding: 2px 6px; border-radius: 3px; letter-spacing: 1px; }
+  .title { font-weight: 900; font-size: 92px; line-height: 0.95; margin: 14px 0 14px; color: var(--accent); letter-spacing: 3px;
+    text-shadow: 0 0 30px #7cff3a55, 0 4px 0 #0b2a05; }
+  .meta { display: flex; gap: 12px; align-items: center; color: #ccc; font-size: 15px; margin-bottom: 14px; }
+  .meta .new { color: #46d369; font-weight: 700; } .meta .box { border: 1px solid #aaa; padding: 0 6px; font-size: 13px; }
+  .desc { font-size: 18px; line-height: 1.45; color: #e6e6e6; margin: 0 0 24px; }
+  .btns { display: flex; gap: 12px; }
+  .play { background: #fff; color: #000; border: 0; border-radius: 6px; padding: 12px 30px; font-size: 20px; font-weight: 800; display: flex; align-items: center; gap: 10px; }
+  .play:hover { background: #ffffffcc; }
+  .more { background: #6d6d6eb3; color: #fff; border: 0; border-radius: 6px; padding: 12px 26px; font-size: 20px; font-weight: 700; }
+  .play svg, .more svg { width: 26px; height: 26px; }
+  /* ---------- episodes ---------- */
+  main { padding: 0 48px 60px; margin-top: -60px; position: relative; z-index: 2; }
+  h2 { font-size: 22px; margin: 0 0 14px; display: flex; align-items: baseline; gap: 14px; }
+  h2 small { color: var(--muted); font-weight: 500; font-size: 15px; }
+  .eps { display: flex; flex-direction: column; gap: 0; max-width: 1100px; }
+  .ep { display: grid; grid-template-columns: 40px 230px 1fr; gap: 22px; align-items: center; padding: 22px 18px; border-bottom: 1px solid #2a2a30; border-radius: 6px; }
+  .ep.ready { cursor: pointer; } .ep.ready:hover { background: #1c1c22; }
+  .ep .num { font-size: 28px; color: #bbb; text-align: center; }
+  .thumb { position: relative; aspect-ratio: 16/9; border-radius: 6px; overflow: hidden; background: #222 center/cover; }
+  .thumb .bar { position: absolute; left: 0; bottom: 0; height: 4px; background: var(--red); }
+  .thumb .lock { position: absolute; inset: 0; display: grid; place-items: center; background: #000a; color: #ddd; font-weight: 800; letter-spacing: 2px; font-size: 13px; }
+  .ep.ready .thumb::after { content: ""; position: absolute; inset: 0; margin: auto; width: 44px; height: 44px; border-radius: 50%; border: 2px solid #fff; background: #000a url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8 5v14l11-7z' fill='white'/%3E%3C/svg%3E") center/22px no-repeat; opacity: 0; transition: opacity .15s; }
+  .ep.ready:hover .thumb::after { opacity: 1; }
+  .ep h3 { margin: 0 0 6px; font-size: 17px; display: flex; justify-content: space-between; gap: 10px; }
+  .ep h3 span { color: var(--muted); font-weight: 500; }
+  .ep p { margin: 0; color: #b5b5bb; font-size: 14px; line-height: 1.45; }
+  footer { color: #6f6f78; font-size: 13px; padding: 30px 48px 40px; }
+  /* ---------- intro + player ---------- */
+  #intro, #player { position: fixed; inset: 0; background: #000; z-index: 20; display: none; }
+  #intro { place-items: center; }
+  #intro .mark { font-weight: 900; font-size: 140px; letter-spacing: 10px; color: var(--red); opacity: 0; transform: scale(1.6); filter: blur(10px); }
+  #intro.go .mark { animation: mark 2.6s cubic-bezier(.2,.8,.2,1) forwards; }
+  @keyframes mark { 0% { opacity: 0; transform: scale(1.6); filter: blur(12px); } 25% { opacity: 1; transform: scale(1); filter: blur(0); letter-spacing: 10px; }
+    75% { opacity: 1; transform: scale(1.04); letter-spacing: 16px; } 100% { opacity: 0; transform: scale(1.4); filter: blur(8px); letter-spacing: 40px; } }
+  #intro .mark span { color: #fff; }
+  video { width: 100%; height: 100%; background: #000; display: block; }
+  .ctrl { position: absolute; inset: auto 0 0; padding: 18px 30px 22px; background: linear-gradient(#0000, #000c); display: flex; flex-direction: column; gap: 12px; transition: opacity .3s; }
+  .top { position: absolute; inset: 0 0 auto; padding: 20px 30px; display: flex; align-items: center; gap: 16px; background: linear-gradient(#000b, #0000); transition: opacity .3s; }
+  .top button { background: none; border: 0; color: #fff; display: flex; align-items: center; gap: 8px; font-size: 16px; }
+  .top b { font-size: 18px; } .top span { color: #ccc; }
+  #player.idle .ctrl, #player.idle .top { opacity: 0; } #player.idle { cursor: none; }
+  .seek { position: relative; height: 6px; background: #ffffff40; border-radius: 3px; cursor: pointer; }
+  .seek:hover { height: 9px; }
+  .seek .buf { position: absolute; inset: 0 auto 0 0; background: #ffffff55; border-radius: 3px; }
+  .seek .pos { position: absolute; inset: 0 auto 0 0; background: var(--red); border-radius: 3px; }
+  .seek .dot { position: absolute; top: 50%; width: 16px; height: 16px; margin: -8px; border-radius: 50%; background: var(--red); }
+  .row { display: flex; align-items: center; gap: 22px; }
+  .row button { background: none; border: 0; color: #fff; padding: 4px; display: grid; place-items: center; }
+  .row button svg { width: 30px; height: 30px; }
+  .row .time { font-variant-numeric: tabular-nums; color: #ddd; }
+  .row .name { margin: 0 auto; font-weight: 700; } .row .name span { color: #aaa; font-weight: 500; }
+  .row input[type=range] { width: 100px; accent-color: #fff; }
+  .toast { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: #000a; padding: 14px 22px; border-radius: 40px; font-size: 22px; font-weight: 700; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .next { position: absolute; right: 40px; bottom: 110px; background: #16161aee; border: 1px solid #333; border-radius: 8px; padding: 16px 20px; display: none; max-width: 320px; }
+  .next b { display: block; font-size: 17px; margin-bottom: 4px; } .next p { margin: 0; color: #aaa; font-size: 14px; }
+  :focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+</style>
+</head>
+<body>
+<header><div class="logo">NIGHT<span>REEL</span></div><nav><b>Home</b><span>Shows</span><span>Movies</span><span>My List</span></nav></header>
+
+<section class="hero" id="hero" style="background-image:url('art/hero.jpg')">
+  <div class="info">
+    <div class="badge"><i>N R</i> ORIGINAL SERIES</div>
+    <div class="title">UNKILLABLE</div>
+    <div class="meta"><span class="new">New episode</span><span>2026</span><span class="box">16+</span><span>1 Season</span><span class="box">HD</span></div>
+    <p class="desc">Something fell on the town of Dunmore. It keeps dying. It keeps coming back. And every time it comes back, it comes back a little different.</p>
+    <div class="btns">
+      <button class="play" id="heroPlay"><svg viewBox="0 0 24 24"><path d="M7 4v16l13-8z" fill="currentColor"/></svg><span id="heroPlayText">Play</span></button>
+      <button class="more" id="moreBtn"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 10v7M12 7v.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>More Info</button>
+    </div>
+  </div>
+</section>
+
+<main id="eps-section">
+  <h2>Episodes <small>Season 1</small></h2>
+  <div class="eps" id="eps"></div>
+</main>
+<footer>NIGHTREEL. Made for one viewer. UNKILLABLE is an original show.</footer>
+
+<div id="intro"><div class="mark">NIGHT<span>REEL</span></div></div>
+
+<div id="player">
+  <video id="v" preload="auto" src="episode1.mp4"></video>
+  <div class="top"><button id="back"><svg width="28" height="28" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button><b>UNKILLABLE</b><span>E1 · Welcome to Dunmore</span></div>
+  <div class="toast" id="toast"></div>
+  <div class="next" id="next"><b>Episode 2 is coming soon</b><p>You'll see it here when it comes out.</p></div>
+  <div class="ctrl">
+    <div class="seek" id="seek"><div class="buf" id="buf"></div><div class="pos" id="pos"></div><div class="dot" id="dot"></div></div>
+    <div class="row">
+      <button id="pp" aria-label="Play or pause"></button>
+      <button id="back10" aria-label="Back 10 seconds"><svg viewBox="0 0 24 24"><path d="M12 5V2L7 6l5 4V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z" fill="white"/><text x="12" y="16" font-size="7" text-anchor="middle" fill="white" font-family="sans-serif" font-weight="700">10</text></svg></button>
+      <button id="fwd10" aria-label="Forward 10 seconds"><svg viewBox="0 0 24 24"><path d="M12 5V2l5 4-5 4V7a6 6 0 1 0 6 6h2a8 8 0 1 1-8-8z" fill="white"/><text x="12" y="16" font-size="7" text-anchor="middle" fill="white" font-family="sans-serif" font-weight="700">10</text></svg></button>
+      <button id="mute" aria-label="Mute"></button><input id="vol" type="range" min="0" max="1" step="0.01" aria-label="Volume">
+      <span class="time" id="time">0:00 / 0:00</span>
+      <span class="name">UNKILLABLE <span>E1 Welcome to Dunmore</span></span>
+      <button id="fs" aria-label="Full screen"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="white" stroke-width="2.2"/></svg></button>
+    </div>
+  </div>
+</div>
+
+<script>
+const store = { get(k, d) { try { const v = localStorage.getItem('nightreel.' + k); return v === null ? d : JSON.parse(v); } catch { return d; } }, set(k, v) { try { localStorage.setItem('nightreel.' + k, JSON.stringify(v)); } catch {} } };
+const $ = (id) => document.getElementById(id);
+const v = $('v'), player = $('player');
+const EPS = [
+  { n: 1, title: 'Welcome to Dunmore', len: '23m', ready: true, desc: 'A strange thing crawls out of a crater outside Dunmore and finds out, again and again, that the town is not friendly. Then the army comes.' },
+  { n: 2, title: 'Coming soon', len: '', ready: false, desc: 'Episode 2 is on the way.' },
+  { n: 3, title: 'Coming soon', len: '', ready: false, desc: 'Episode 3 is on the way.' },
+  { n: 4, title: 'Coming soon', len: '', ready: false, desc: 'Episode 4 is on the way.' },
+  { n: 5, title: 'Coming soon', len: '', ready: false, desc: 'Episode 5 is on the way.' },
+];
+function renderEps() {
+  const resume = store.get('ep1', 0), dur = store.get('ep1dur', 0);
+  $('heroPlayText').textContent = resume > 30 ? 'Resume' : 'Play';
+  $('eps').innerHTML = '';
+  for (const e of EPS) {
+    const d = document.createElement('div'); d.className = 'ep' + (e.ready ? ' ready' : ''); d.tabIndex = e.ready ? 0 : -1;
+    d.innerHTML = `<div class="num">${e.n}</div><div class="thumb" style="background-image:url('art/ep${e.n}.jpg')">${e.ready ? (dur ? `<div class="bar" style="width:${Math.min(100, resume / dur * 100)}%"></div>` : '') : '<div class="lock">COMING SOON</div>'}</div><div><h3>${e.ready ? e.title : 'Episode ' + e.n}<span>${e.len}</span></h3><p>${e.desc}</p></div>`;
+    if (e.ready) { d.onclick = start; d.onkeydown = (k) => { if (k.key === 'Enter') start(); }; }
+    $('eps').appendChild(d);
+  }
+}
+renderEps();
+$('heroPlay').onclick = start;
+$('moreBtn').onclick = () => $('eps-section').scrollIntoView({ behavior: 'smooth' });
+
+// our own intro sound: two deep hits + a rising shimmer
+function introSound() {
+  try {
+    const ac = new AudioContext(), now = ac.currentTime, out = ac.createGain(); out.gain.value = 0.6; out.connect(ac.destination);
+    const hit = (t, f) => { const o = ac.createOscillator(), g = ac.createGain(); o.type = 'sawtooth'; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 0.5, t + 1.2);
+      const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 600; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.9, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.6);
+      o.connect(lp).connect(g).connect(out); o.start(t); o.stop(t + 1.7); };
+    hit(now + 0.05, 82); hit(now + 0.45, 61);
+    [523, 659, 784].forEach((f, i) => { const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = f; g.gain.setValueAtTime(0, now + 0.5); g.gain.linearRampToValueAtTime(0.06, now + 1.2 + i * 0.1); g.gain.linearRampToValueAtTime(0, now + 2.5); o.connect(g).connect(out); o.start(now + 0.5); o.stop(now + 2.6); });
+    setTimeout(() => ac.close(), 3000);
+  } catch {}
+}
+function start() {
+  const intro = $('intro');
+  intro.style.display = 'grid'; intro.classList.remove('go'); void intro.offsetWidth; intro.classList.add('go');
+  introSound();
+  document.documentElement.requestFullscreen?.().catch(() => {});
+  setTimeout(() => {
+    intro.style.display = 'none'; player.style.display = 'block';
+    const r = store.get('ep1', 0); if (r > 5 && r < (v.duration || 1e9) - 20) v.currentTime = r;
+    v.play().catch(() => {}); poke();
+  }, 2700);
+}
+function stop() { v.pause(); store.set('ep1', v.currentTime); player.style.display = 'none'; $('next').style.display = 'none'; if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); renderEps(); }
+$('back').onclick = stop;
+
+// controls
+const icon = { play: '<svg viewBox="0 0 24 24"><path d="M7 4v16l13-8z" fill="white"/></svg>', pause: '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z" fill="white"/></svg>',
+  vol: '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="white"/><path d="M16 8a5 5 0 0 1 0 8M18.5 5.5a8.5 8.5 0 0 1 0 13" fill="none" stroke="white" stroke-width="2"/></svg>',
+  muted: '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="white"/><path d="M16 9l5 6M21 9l-5 6" stroke="white" stroke-width="2"/></svg>' };
+const fmt = (s) => { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+function sync() {
+  $('pp').innerHTML = v.paused ? icon.play : icon.pause;
+  $('mute').innerHTML = v.muted || v.volume === 0 ? icon.muted : icon.vol;
+  const p = v.duration ? v.currentTime / v.duration : 0;
+  $('pos').style.width = p * 100 + '%'; $('dot').style.left = p * 100 + '%';
+  if (v.buffered.length) $('buf').style.width = (v.buffered.end(v.buffered.length - 1) / (v.duration || 1)) * 100 + '%';
+  $('time').textContent = fmt(v.currentTime) + ' / ' + fmt(v.duration);
+}
+['timeupdate', 'play', 'pause', 'volumechange', 'progress', 'loadedmetadata'].forEach((e) => v.addEventListener(e, sync));
+v.addEventListener('loadedmetadata', () => store.set('ep1dur', v.duration));
+let saveT = 0; v.addEventListener('timeupdate', () => { if (Date.now() - saveT > 4000) { store.set('ep1', v.currentTime); saveT = Date.now(); } });
+v.addEventListener('ended', () => { store.set('ep1', 0); $('next').style.display = 'block'; poke(); });
+const toast = (s) => { const t = $('toast'); t.textContent = s; t.style.opacity = 1; clearTimeout(toast.h); toast.h = setTimeout(() => (t.style.opacity = 0), 600); };
+const pp = () => { if (v.paused) v.play(); else v.pause(); };
+$('pp').onclick = pp; v.onclick = pp;
+$('back10').onclick = () => { v.currentTime -= 10; toast('-10s'); };
+$('fwd10').onclick = () => { v.currentTime += 10; toast('+10s'); };
+$('mute').onclick = () => { v.muted = !v.muted; };
+$('vol').value = v.volume = store.get('vol', 1);
+$('vol').oninput = () => { v.volume = +$('vol').value; v.muted = false; store.set('vol', v.volume); };
+$('fs').onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.(); };
+const seekTo = (e) => { const r = $('seek').getBoundingClientRect(); v.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * (v.duration || 0); };
+let drag = false;
+$('seek').addEventListener('pointerdown', (e) => { drag = true; seekTo(e); $('seek').setPointerCapture(e.pointerId); });
+$('seek').addEventListener('pointermove', (e) => { if (drag) seekTo(e); });
+$('seek').addEventListener('pointerup', () => (drag = false));
+let idleT; function poke() { player.classList.remove('idle'); clearTimeout(idleT); idleT = setTimeout(() => { if (!v.paused) player.classList.add('idle'); }, 2500); }
+player.addEventListener('pointermove', poke);
+addEventListener('keydown', (e) => {
+  if (player.style.display !== 'block') return;
+  poke();
+  if (e.code === 'Space' || e.key === 'k') { e.preventDefault(); pp(); }
+  else if (e.key === 'ArrowRight') { v.currentTime += 10; toast('+10s'); }
+  else if (e.key === 'ArrowLeft') { v.currentTime -= 10; toast('-10s'); }
+  else if (e.key === 'ArrowUp') { v.volume = Math.min(1, v.volume + 0.1); $('vol').value = v.volume; }
+  else if (e.key === 'ArrowDown') { v.volume = Math.max(0, v.volume - 0.1); $('vol').value = v.volume; }
+  else if (e.key === 'f') $('fs').click();
+  else if (e.key === 'm') v.muted = !v.muted;
+  else if (e.key === 'Escape' && !document.fullscreenElement) stop();
+});
+sync();
+setInterval(() => fetch('/alive').catch(() => {}), 10000);
+</script>
+</body>
+</html>
