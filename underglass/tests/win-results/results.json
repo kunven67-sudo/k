@@ -1,0 +1,54 @@
+{
+ "ok": true,
+ "errors": [],
+ "steps": {
+  "ready": true,
+  "pclook": {
+   "user": true,
+   "light": true,
+   "wallpaper": true,
+   "desktop": 5,
+   "desktopIcons": 5,
+   "pinned": 2,
+   "start": 120,
+   "startIcons": 120,
+   "recycle": true,
+   "cursors": 7,
+   "align": "center",
+   "search": 2,
+   "error": null
+  },
+  "iconSize": [
+   48,
+   48
+  ],
+  "font": {
+   "fluent": true,
+   "glyphs": 11,
+   "svgs": 0
+  },
+  "rip": {
+   "bodies": 1,
+   "ripped": 1
+  },
+  "spawn": {
+   "bodies": 11,
+   "sticks": 4
+  },
+  "boom": {
+   "bodies": 41,
+   "ripped": 6
+  },
+  "fps": 30,
+  "world": {
+   "day": 1,
+   "pop": 6,
+   "buildings": 3
+  },
+  "worldFps": 26,
+  "saved": [
+   "universe-umwurr380289.json",
+   "universes.json"
+  ]
+ }
+}
