@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Code</title>
+<link rel="stylesheet" href="../../vendor/codemirror.css">
+<style>
+  :root {
+    --bg: #07080e; --side: #0b0d17; --panel: #10142a; --hi: #182040; --line: rgba(255,255,255,.08); --line2: rgba(255,255,255,.16);
+    --text: #eef1ff; --muted: #8d93b5; --acc: #3dffa0; --acc2: #00e5ff; --bad: #ff3d6e; --warn: #ffc23d;
+    --mono: ui-monospace, "Cascadia Code", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+  button, input, select, textarea { font-family: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+  svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .app { display: flex; flex-direction: column; height: 100%; }
+  .top { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); flex-wrap: wrap; background: linear-gradient(180deg, rgba(61,255,160,.06), transparent); }
+  .top .name { background: none; border: 1px solid transparent; border-radius: 9px; padding: 6px 8px; font-weight: 800; font-size: 15px; min-width: 60px; max-width: 220px; }
+  .top .name:hover, .top .name:focus { border-color: var(--line2); background: rgba(0,0,0,.3); outline: none; }
+  .grow { flex: 1; }
+  .btn { border: 1px solid var(--line2); background: var(--panel); border-radius: 10px; padding: 7px 11px; font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: background .15s; }
+  .btn:hover { background: var(--hi); }
+  .btn.primary { background: var(--acc); color: #00170b; border-color: var(--acc); box-shadow: 0 0 14px rgba(61,255,160,.35); }
+  .btn.on { border-color: var(--acc); color: var(--acc); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  select { background: var(--panel); border: 1px solid var(--line2); border-radius: 10px; padding: 6px 8px; font-size: 13px; max-width: 190px; }
+  .body { flex: 1; display: flex; min-height: 0; }
+  .code { flex: 1; display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--line); }
+  .ftabs { display: flex; gap: 2px; padding: 6px 8px 0; background: var(--side); border-bottom: 1px solid var(--line); }
+  .ftab { border: 1px solid transparent; border-bottom: 0; background: none; border-radius: 9px 9px 0 0; padding: 7px 14px; font-weight: 800; font-size: 12.5px; color: var(--muted); font-family: var(--mono); }
+  .ftab.on { background: var(--bg); border-color: var(--line); color: var(--text); margin-bottom: -1px; }
+  .ftab .err { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--bad); margin-left: 6px; vertical-align: middle; }
+  .editor { flex: 1; min-height: 0; position: relative; }
+  .editor .CodeMirror, .editor textarea { position: absolute; inset: 0; height: 100%; width: 100%; }
+  .editor textarea { background: var(--bg); border: 0; resize: none; padding: 12px; font-family: var(--mono); font-size: 14px; line-height: 1.55; color: var(--text); outline: none; tab-size: 2; }
+  .right { width: 46%; min-width: 280px; display: flex; flex-direction: column; min-height: 0; }
+  .pbar { display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: var(--side); border-bottom: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+  .pbar b { color: var(--text); font-size: 12.5px; }
+  .live { display: inline-flex; align-items: center; gap: 5px; }
+  .live i { width: 7px; height: 7px; border-radius: 50%; background: var(--acc); box-shadow: 0 0 8px var(--acc); }
+  .icon { width: 30px; height: 30px; padding: 0; display: inline-grid; place-items: center; border-radius: 8px; border: 1px solid transparent; background: none; color: var(--muted); }
+  .icon:hover { background: rgba(255,255,255,.07); color: var(--text); }
+  .preview { flex: 1; min-height: 0; background: #fff; position: relative; }
+  .preview iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; }
+  .console { height: 30%; min-height: 70px; display: flex; flex-direction: column; border-top: 1px solid var(--line); background: #05060b; }
+  .console.closed { height: auto; min-height: 0; }
+  .chead { display: flex; align-items: center; gap: 6px; padding: 4px 8px; font-size: 12px; font-weight: 800; color: var(--muted); letter-spacing: .08em; cursor: pointer; user-select: none; }
+  .chead .n { background: var(--bad); color: #fff; border-radius: 10px; padding: 0 6px; font-size: 11px; letter-spacing: 0; }
+  .clog { flex: 1; overflow-y: auto; font-family: var(--mono); font-size: 12.5px; padding: 2px 0 6px; }
+  .console.closed .clog { display: none; }
+  .row { padding: 3px 10px; border-bottom: 1px solid rgba(255,255,255,.04); white-space: pre-wrap; word-break: break-word; }
+  .row.warn { color: var(--warn); background: rgba(255,194,61,.05); }
+  .row.error { color: #ff8aa8; background: rgba(255,61,110,.07); }
+  .row.info { color: var(--acc2); }
+  .row .ln { float: right; color: var(--muted); cursor: pointer; text-decoration: underline; }
+  .empty-c { color: var(--muted); padding: 6px 10px; font-family: system-ui, sans-serif; font-size: 12px; }
+  /* examples */
+  .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: grid; place-items: center; z-index: 50; padding: 14px; }
+  .modal { background: var(--panel); border: 1px solid var(--line2); border-radius: 16px; width: min(760px, 100%); max-height: 90%; display: flex; flex-direction: column; box-shadow: 0 30px 80px rgba(0,0,0,.6); }
+  .modal header { display: flex; align-items: center; padding: 14px 16px 8px; gap: 8px; }
+  .modal header h2 { margin: 0; font-size: 17px; flex: 1; }
+  .modal .mbody { overflow-y: auto; padding: 4px 16px 16px; }
+  .ex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
+  .ex { text-align: left; border: 1px solid var(--line2); background: rgba(255,255,255,.03); border-radius: 12px; padding: 11px; display: flex; flex-direction: column; gap: 4px; }
+  .ex:hover, .ex:focus-visible { border-color: var(--acc); background: rgba(61,255,160,.06); }
+  .ex b { font-size: 14px; }
+  .ex span { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+  .ex em { font-style: normal; font-size: 11px; font-weight: 800; color: var(--acc); letter-spacing: .06em; }
+  .modal p { color: var(--muted); font-size: 13.5px; line-height: 1.5; margin: 0 0 12px; }
+  .modal input.txt { width: 100%; background: rgba(0,0,0,.3); border: 1px solid var(--line2); border-radius: 10px; padding: 9px 11px; font-size: 14px; margin-bottom: 12px; }
+  .modal .acts { display: flex; gap: 8px; justify-content: flex-end; padding: 0 16px 16px; flex-wrap: wrap; }
+  .toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%) translateY(16px); opacity: 0; pointer-events: none; background: #13202a; border: 1px solid var(--line2); padding: 9px 14px; border-radius: 22px; font-size: 13px; transition: all .2s; box-shadow: 0 10px 30px rgba(0,0,0,.5); z-index: 60; }
+  .toast.show { opacity: 1; transform: translateX(-50%); }
+  .views { display: none; }
+  /* dark editor colors */
+  .CodeMirror { background: var(--bg); color: #e6e9ff; font-family: var(--mono); font-size: 14px; line-height: 1.55; }
+  .CodeMirror-gutters { background: var(--side); border-right: 1px solid var(--line); }
+  .CodeMirror-linenumber { color: #4d5478; }
+  .CodeMirror-cursor { border-left: 2px solid var(--acc); }
+  .CodeMirror-selected, .CodeMirror-focused .CodeMirror-selected { background: rgba(61,255,160,.16) !important; }
+  .CodeMirror-activeline-background { background: rgba(255,255,255,.03); }
+  .CodeMirror-matchingbracket { color: var(--acc) !important; text-decoration: underline; }
+  .cm-s-default .cm-keyword { color: #ff79c6; } .cm-s-default .cm-def { color: #50fa7b; } .cm-s-default .cm-variable-2 { color: #8be9fd; } .cm-s-default .cm-variable-3, .cm-s-default .cm-type { color: #8be9fd; }
+  .cm-s-default .cm-string, .cm-s-default .cm-string-2 { color: #f1fa8c; } .cm-s-default .cm-number { color: #bd93f9; } .cm-s-default .cm-comment { color: #6272a4; font-style: italic; }
+  .cm-s-default .cm-atom { color: #bd93f9; } .cm-s-default .cm-property { color: #66d9ef; } .cm-s-default .cm-operator { color: #ff79c6; } .cm-s-default .cm-tag { color: #ff79c6; }
+  .cm-s-default .cm-attribute { color: #50fa7b; } .cm-s-default .cm-qualifier, .cm-s-default .cm-builtin { color: #8be9fd; } .cm-s-default .cm-meta { color: #ffb86c; } .cm-s-default .cm-bracket { color: #9aa0c3; }
+  .cm-s-default .cm-error { color: #ff5555; }
+  .err-line { background: rgba(255,61,110,.15); }
+  @media (max-width: 760px) {
+    .views { display: flex; gap: 4px; }
+    .body .right { width: 100%; min-width: 0; }
+    .app[data-v="code"] .right { display: none; }
+    .app[data-v="preview"] .code { display: none; }
+    .code { border-right: 0; }
+    .hide-sm { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app" data-v="code">
+  <div class="top">
+    <input class="name" id="name" maxlength="60" aria-label="Project name" spellcheck="false">
+    <select id="proj" aria-label="Your projects" title="Your projects"></select>
+    <button class="btn" id="b-new" title="New project"></button>
+    <button class="btn" id="b-ex" title="Examples and lessons"></button>
+    <div class="grow"></div>
+    <div class="views"><button class="btn" data-v="code">Code</button><button class="btn" data-v="preview">Preview</button></div>
+    <button class="btn" id="b-ai" title="Copy your code with a question for an AI"></button>
+    <button class="btn primary" id="b-save" title="Save as a game or app in Game System"></button>
+  </div>
+  <div class="body">
+    <section class="code">
+      <div class="ftabs" role="tablist">
+        <button class="ftab" data-f="html" role="tab">HTML</button>
+        <button class="ftab" data-f="css" role="tab">CSS</button>
+        <button class="ftab" data-f="js" role="tab">JS</button>
+      </div>
+      <div class="editor" id="editor"></div>
+    </section>
+    <section class="right">
+      <div class="pbar">
+        <span class="live" id="live-dot"><i></i></span><b>Preview</b>
+        <label class="hide-sm" style="display:inline-flex;gap:4px;align-items:center;margin-left:6px"><input type="checkbox" id="auto"> auto-run</label>
+        <div class="grow"></div>
+        <button class="icon" id="b-run" title="Run (Ctrl+Enter)" aria-label="Run"></button>
+        <button class="icon" id="b-dl" title="Download as one .html file" aria-label="Download"></button>
+      </div>
+      <div class="preview" id="preview"></div>
+      <div class="console" id="console">
+        <div class="chead" id="chead">CONSOLE <span class="n" id="cn" hidden>0</span><div class="grow"></div><button class="icon" id="b-clear" title="Clear" aria-label="Clear console"></button></div>
+        <div class="clog" id="clog"></div>
+      </div>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script src="../../vendor/codemirror.min.js"></script>
+<script>
+(function () {
+  'use strict';
+  var GS = window.GameSystem;
+  var KEY = 'gs2-code';
+  var store = GS || {
+    load: function () { try { return JSON.parse(localStorage.getItem(KEY)); } catch (e) { return null; } },
+    autoSave: function (fn) { function w() { try { localStorage.setItem(KEY, JSON.stringify(fn())); } catch (e) { /* full */ } } setInterval(w, 2000); window.addEventListener('pagehide', w); }
+  };
+  var ICON = {
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    book: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5M8 7h7"/>',
+    play: '<path d="M7 4.5v15l13-7.5z" fill="currentColor" stroke="none"/>',
+    save: '<path d="M5 3h11l3 3v15H5z"/><path d="M8 3v5h7M8 21v-7h8v7"/>',
+    down: '<path d="M12 4v12M7 11l5 5 5-5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>',
+    clear: '<circle cx="12" cy="12" r="8"/><path d="M6.5 17.5l11-11"/>',
+    spark: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/>',
+    x: '<path d="M6 6l12 12M18 6L6 18"/>',
+    trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>'
+  };
+  function svg(n) { return '<svg viewBox="0 0 24 24" aria-hidden="true">' + (ICON[n] || '') + '</svg>'; }
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function uid() { return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+  /* ---------------- examples + lessons ---------------- */
+  var EX = [
+    { id: 'hello', tag: 'LESSON 1', name: 'Hello, web page', desc: 'What HTML, CSS and JS each do. Change the words and colors!',
+      html: '<h1>Hello, bro!</h1>\n<p>This is <b>HTML</b>: it says what is on the page.</p>\n<p>The <b>CSS</b> tab makes it look cool.</p>\n<p>The <b>JS</b> tab makes it do stuff. Click the button:</p>\n<button id="btn">Click me</button>\n<p id="out"></p>',
+      css: 'body {\n  font-family: system-ui, sans-serif;\n  background: #0b0f1e;\n  color: white;\n  text-align: center;\n  padding: 30px;\n}\nh1 { color: #3dffa0; font-size: 48px; }\nbutton {\n  font-size: 20px;\n  padding: 10px 24px;\n  border: 0;\n  border-radius: 12px;\n  background: #00e5ff;\n  cursor: pointer;\n}',
+      js: '// This runs when the page loads\nconst btn = document.getElementById("btn");\nconst out = document.getElementById("out");\nlet clicks = 0;\n\nbtn.addEventListener("click", () => {\n  clicks = clicks + 1;\n  out.textContent = "You clicked " + clicks + " times!";\n  console.log("click number", clicks);\n});' },
+    { id: 'neon', tag: 'CSS', name: 'Neon buttons', desc: 'Glowing buttons with hover effects and animations.',
+      html: '<div class="wrap">\n  <button class="neon cyan">PLAY</button>\n  <button class="neon pink">OPTIONS</button>\n  <button class="neon green">QUIT</button>\n</div>',
+      css: 'body { margin: 0; height: 100vh; display: grid; place-items: center; background: #05060a; font-family: system-ui, sans-serif; }\n.wrap { display: flex; flex-direction: column; gap: 22px; }\n.neon {\n  --c: #00e5ff;\n  font-size: 26px; font-weight: 900; letter-spacing: 6px;\n  padding: 14px 50px; background: transparent; color: var(--c);\n  border: 3px solid var(--c); border-radius: 14px; cursor: pointer;\n  box-shadow: 0 0 12px var(--c), inset 0 0 12px var(--c);\n  text-shadow: 0 0 8px var(--c);\n  transition: transform .15s, background .2s, color .2s;\n}\n.neon:hover { background: var(--c); color: #05060a; transform: scale(1.06); }\n.pink { --c: #ff2bd6; }\n.green { --c: #3dffa0; animation: pulse 1.6s infinite; }\n@keyframes pulse { 50% { box-shadow: 0 0 30px var(--c), inset 0 0 20px var(--c); } }',
+      js: '' },
+    { id: 'ball', tag: 'CANVAS', name: 'Bouncing balls', desc: 'Draw on a canvas and animate 60 times a second.',
+      html: '<canvas id="c"></canvas>',
+      css: 'html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }\ncanvas { display: block; }',
+      js: 'const c = document.getElementById("c");\nconst ctx = c.getContext("2d");\nfunction size() { c.width = innerWidth; c.height = innerHeight; }\nsize(); addEventListener("resize", size);\n\nconst balls = [];\nfor (let i = 0; i < 25; i++) {\n  balls.push({\n    x: Math.random() * c.width, y: Math.random() * c.height,\n    vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8,\n    r: 10 + Math.random() * 25, hue: Math.random() * 360\n  });\n}\n\nfunction loop() {\n  ctx.fillStyle = "rgba(0,0,0,0.25)"; // leaves a little trail\n  ctx.fillRect(0, 0, c.width, c.height);\n  for (const b of balls) {\n    b.x += b.vx; b.y += b.vy;\n    if (b.x < b.r || b.x > c.width - b.r) b.vx *= -1;\n    if (b.y < b.r || b.y > c.height - b.r) b.vy *= -1;\n    ctx.beginPath();\n    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);\n    ctx.fillStyle = "hsl(" + b.hue + ", 100%, 60%)";\n    ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 20;\n    ctx.fill();\n  }\n  requestAnimationFrame(loop);\n}\nloop();\n\n// click to add a ball\nc.addEventListener("click", e => balls.push({ x: e.clientX, y: e.clientY, vx: 6, vy: -6, r: 20, hue: Math.random() * 360 }));' },
+    { id: 'stars', tag: 'GAME', name: 'Catch the stars', desc: 'A small game: move with arrow keys or the mouse, catch stars, dodge bombs. Saves your best score.',
+      html: '<canvas id="c" width="480" height="640"></canvas>\n<div id="hud">Score: <b id="s">0</b> · Best: <b id="best">0</b></div>',
+      css: 'body { margin: 0; height: 100vh; display: grid; place-items: center; background: #070814; font-family: system-ui, sans-serif; color: white; }\ncanvas { background: linear-gradient(#0b1030, #1a0b30); border-radius: 12px; max-width: 100vw; max-height: 85vh; box-shadow: 0 0 40px #4b2bff55; }\n#hud { position: fixed; top: 10px; left: 0; right: 0; text-align: center; font-size: 20px; }',
+      js: 'const c = document.getElementById("c"), ctx = c.getContext("2d");\nconst W = c.width, H = c.height;\nlet player = { x: W / 2, w: 70 }, things = [], score = 0, over = false, keys = {};\nlet best = 0;\n\n// In Game System, GameSystem saves stuff for you (best score here)\nif (window.GameSystem) {\n  const saved = GameSystem.load();\n  if (saved) best = saved.best || 0;\n  GameSystem.autoSave(() => ({ best }));\n}\ndocument.getElementById("best").textContent = best;\n\naddEventListener("keydown", e => keys[e.key] = true);\naddEventListener("keyup", e => keys[e.key] = false);\nc.addEventListener("mousemove", e => { const r = c.getBoundingClientRect(); player.x = (e.clientX - r.left) / r.width * W; });\nc.addEventListener("click", () => { if (over) restart(); });\n\nfunction restart() { things = []; score = 0; over = false; }\n\nfunction loop() {\n  if (!over) {\n    if (keys.ArrowLeft) player.x -= 8;\n    if (keys.ArrowRight) player.x += 8;\n    player.x = Math.max(player.w / 2, Math.min(W - player.w / 2, player.x));\n    if (Math.random() < 0.04) things.push({ x: Math.random() * W, y: -20, bomb: Math.random() < 0.25, v: 3 + score / 15 });\n    for (const t of things) {\n      t.y += t.v;\n      if (t.y > H - 40 && t.y < H - 10 && Math.abs(t.x - player.x) < player.w / 2) {\n        t.y = H + 100;\n        if (t.bomb) over = true; else score++;\n      }\n    }\n    things = things.filter(t => t.y < H + 50);\n    if (score > best) best = score;\n  }\n  ctx.clearRect(0, 0, W, H);\n  for (const t of things) {\n    ctx.font = "30px serif";\n    ctx.fillText(t.bomb ? "💣" : "⭐", t.x - 15, t.y);\n  }\n  ctx.fillStyle = "#00e5ff";\n  ctx.fillRect(player.x - player.w / 2, H - 30, player.w, 14);\n  if (over) {\n    ctx.fillStyle = "white"; ctx.font = "bold 40px system-ui"; ctx.textAlign = "center";\n    ctx.fillText("BOOM! Click to retry", W / 2, H / 2); ctx.textAlign = "left";\n  }\n  document.getElementById("s").textContent = score;\n  document.getElementById("best").textContent = best;\n  requestAnimationFrame(loop);\n}\nloop();' },
+    { id: 'snake', tag: 'GAME', name: 'Snake', desc: 'The classic. Arrow keys or WASD. Shows how a grid game works.',
+      html: '<canvas id="c" width="400" height="400"></canvas>\n<p id="msg">Arrow keys to start</p>',
+      css: 'body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #050a05; color: #3dff7a; font-family: monospace; }\ncanvas { border: 2px solid #3dff7a; box-shadow: 0 0 20px #3dff7a55; max-width: 95vw; }\n#msg { font-size: 18px; }',
+      js: 'const c = document.getElementById("c"), ctx = c.getContext("2d"), msg = document.getElementById("msg");\nconst N = 20, S = c.width / N;\nlet snake, dir, next, food, alive;\nfunction reset() { snake = [{ x: 10, y: 10 }]; dir = { x: 0, y: 0 }; next = dir; food = spot(); alive = true; }\nfunction spot() { return { x: Math.floor(Math.random() * N), y: Math.floor(Math.random() * N) }; }\nreset();\n\naddEventListener("keydown", e => {\n  const k = e.key.toLowerCase();\n  const map = { arrowup: [0, -1], w: [0, -1], arrowdown: [0, 1], s: [0, 1], arrowleft: [-1, 0], a: [-1, 0], arrowright: [1, 0], d: [1, 0] };\n  if (!map[k]) return;\n  e.preventDefault();\n  const [x, y] = map[k];\n  if (x === -dir.x && y === -dir.y && snake.length > 1) return; // no turning back\n  next = { x, y };\n  if (!alive) reset();\n});\n\nsetInterval(() => {\n  dir = next;\n  if (alive && (dir.x || dir.y)) {\n    const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };\n    if (head.x < 0 || head.y < 0 || head.x >= N || head.y >= N || snake.some(p => p.x === head.x && p.y === head.y)) {\n      alive = false; msg.textContent = "Game over! Length " + snake.length + ". Press an arrow key.";\n    } else {\n      snake.unshift(head);\n      if (head.x === food.x && head.y === food.y) food = spot(); else snake.pop();\n      msg.textContent = "Length: " + snake.length;\n    }\n  }\n  ctx.fillStyle = "#050a05"; ctx.fillRect(0, 0, c.width, c.height);\n  ctx.fillStyle = "#ff3d6e"; ctx.fillRect(food.x * S + 2, food.y * S + 2, S - 4, S - 4);\n  ctx.fillStyle = "#3dff7a"; snake.forEach(p => ctx.fillRect(p.x * S + 1, p.y * S + 1, S - 2, S - 2));\n}, 110);' },
+    { id: 'draw', tag: 'JS', name: 'Drawing pad', desc: 'Draw with the mouse or your finger. Pick colors and sizes.',
+      html: '<div id="bar">\n  <input type="color" id="col" value="#00e5ff">\n  <input type="range" id="size" min="2" max="40" value="8">\n  <button id="clear">Clear</button>\n</div>\n<canvas id="c"></canvas>',
+      css: 'html, body { margin: 0; height: 100%; background: #111; overflow: hidden; font-family: system-ui; }\n#bar { position: fixed; top: 10px; left: 10px; display: flex; gap: 10px; align-items: center; background: #222c; padding: 8px 12px; border-radius: 12px; }\nbutton { border: 0; border-radius: 8px; padding: 6px 12px; cursor: pointer; }\ncanvas { display: block; touch-action: none; }',
+      js: 'const c = document.getElementById("c"), ctx = c.getContext("2d");\nfunction size() { c.width = innerWidth; c.height = innerHeight; }\nsize();\nlet down = false, last = null;\nc.addEventListener("pointerdown", e => { down = true; last = [e.clientX, e.clientY]; });\naddEventListener("pointerup", () => down = false);\nc.addEventListener("pointermove", e => {\n  if (!down) return;\n  ctx.strokeStyle = document.getElementById("col").value;\n  ctx.lineWidth = document.getElementById("size").value;\n  ctx.lineCap = "round";\n  ctx.beginPath(); ctx.moveTo(last[0], last[1]); ctx.lineTo(e.clientX, e.clientY); ctx.stroke();\n  last = [e.clientX, e.clientY];\n});\ndocument.getElementById("clear").onclick = () => ctx.clearRect(0, 0, c.width, c.height);' },
+    { id: 'quiz', tag: 'JS', name: 'Quiz maker', desc: 'Questions, answers and a score. Make your own quiz by editing the list.',
+      html: '<div class="card">\n  <h2 id="q"></h2>\n  <div id="answers"></div>\n  <p id="score"></p>\n</div>',
+      css: 'body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: linear-gradient(135deg, #1b0b3a, #0b1e3a); font-family: system-ui, sans-serif; color: white; }\n.card { width: min(480px, 92vw); background: #ffffff10; padding: 24px; border-radius: 18px; }\n#answers button { display: block; width: 100%; margin: 8px 0; padding: 12px; font-size: 17px; border: 0; border-radius: 10px; cursor: pointer; background: #ffffff1c; color: white; }\n#answers button:hover { background: #ffffff33; }\n.right { background: #2ecc71 !important; } .wrong { background: #e74c3c !important; }',
+      js: '// Change these to make your own quiz!\nconst quiz = [\n  { q: "What does HTML stand for?", a: ["HyperText Markup Language", "Hot Tamale Mega Lasagna", "How To Make Lemonade"], right: 0 },\n  { q: "Which tab makes things look cool?", a: ["JS", "CSS", "HTML"], right: 1 },\n  { q: "What does JS do?", a: ["Makes pages do stuff", "Juices oranges", "Nothing"], right: 0 }\n];\nlet i = 0, score = 0;\nfunction show() {\n  const item = quiz[i];\n  document.getElementById("q").textContent = item.q;\n  const box = document.getElementById("answers");\n  box.innerHTML = "";\n  item.a.forEach((text, n) => {\n    const b = document.createElement("button");\n    b.textContent = text;\n    b.onclick = () => {\n      b.className = n === item.right ? "right" : "wrong";\n      if (n === item.right) score++;\n      setTimeout(() => { i++; if (i < quiz.length) show(); else done(); }, 700);\n    };\n    box.appendChild(b);\n  });\n  document.getElementById("score").textContent = "Question " + (i + 1) + " of " + quiz.length;\n}\nfunction done() {\n  document.getElementById("q").textContent = "Done! You got " + score + " / " + quiz.length;\n  document.getElementById("answers").innerHTML = "<button onclick=\\"location.reload()\\">Again</button>";\n  document.getElementById("score").textContent = "";\n}\nshow();' },
+    { id: 'blank', tag: 'START', name: 'Empty project', desc: 'Nothing in it. Build anything.', html: '', css: 'body {\n  font-family: system-ui, sans-serif;\n}', js: '' }
+  ];
+
+  /* ---------------- projects (saved by the Save Kit) ---------------- */
+  var state = { projects: [], cur: null, tab: 'html', auto: true, consoleOpen: true, view: 'code' };
+  var saved = store.load && store.load();
+  if (saved && Array.isArray(saved.projects)) {
+    state.projects = saved.projects.filter(function (p) { return p && typeof p.id === 'string'; }).map(function (p) {
+      return { id: p.id, name: String(p.name || 'My project'), html: String(p.html || ''), css: String(p.css || ''), js: String(p.js || ''), updated: Number(p.updated) || Date.now(), gameId: typeof p.gameId === 'string' ? p.gameId : null, kind: p.kind === 'app' ? 'app' : 'game', cursor: p.cursor || null };
+    });
+    state.cur = typeof saved.cur === 'string' ? saved.cur : null;
+    if (['html', 'css', 'js'].indexOf(saved.tab) >= 0) state.tab = saved.tab;
+    state.auto = saved.auto !== false;
+    state.consoleOpen = saved.consoleOpen !== false;
+    state.view = saved.view === 'preview' ? 'preview' : 'code';
+  }
+  if (!state.projects.length) state.projects.push(fromExample(EX[0]));
+  if (!cur()) state.cur = state.projects[0].id;
+  function fromExample(ex) { return { id: uid(), name: ex.id === 'blank' ? 'My project' : ex.name, html: ex.html, css: ex.css, js: ex.js, updated: Date.now(), gameId: null, kind: 'game', cursor: null }; }
+  function cur() { return state.projects.find(function (p) { return p.id === state.cur; }) || null; }
+  if (store.autoSave) store.autoSave(function (why) { syncFromEditor(); if (cm) { var p = cur(); if (p) p.cursor = { tab: state.tab, line: cm.getCursor().line, ch: cm.getCursor().ch }; } return state; }, 3);
+
+  /* ---------------- the editor ---------------- */
+  var cm = null, ta = null;
+  var MODES = { html: 'htmlmixed', css: 'css', js: 'javascript' };
+  function makeEditor() {
+    var box = $('editor');
+    if (window.CodeMirror) {
+      cm = window.CodeMirror(box, {
+        value: '', mode: MODES[state.tab], lineNumbers: true, tabSize: 2, indentUnit: 2, lineWrapping: true,
+        matchBrackets: true, autoCloseBrackets: true, styleActiveLine: true, inputStyle: 'contenteditable',
+        extraKeys: { 'Ctrl-Enter': run, 'Cmd-Enter': run, 'Ctrl-S': saveDialog, 'Cmd-S': saveDialog, Tab: function (c) { if (c.somethingSelected()) c.indentSelection('add'); else c.replaceSelection('  '); } }
+      });
+      cm.on('change', onEdit);
+    } else {
+      /* the fancy editor didn't load (offline?): a plain box still works */
+      ta = document.createElement('textarea');
+      ta.spellcheck = false;
+      ta.addEventListener('input', onEdit);
+      ta.addEventListener('keydown', function (e) {
+        if (e.key === 'Tab') { e.preventDefault(); var s = ta.selectionStart; ta.setRangeText('  ', s, ta.selectionEnd, 'end'); onEdit(); }
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); run(); }
+      });
+      box.appendChild(ta);
+    }
+  }
+  function getText() { return cm ? cm.getValue() : ta.value; }
+  var loading = false;
+  /* which project + tab the editor is showing right now (nothing until something is loaded) */
+  var shown = { proj: null, tab: null };
+  function shownProject() { var id = shown.proj; return state.projects.find(function (p) { return p.id === id; }) || null; }
+  function setText(t) {
+    loading = true;
+    if (cm) { cm.setOption('mode', MODES[state.tab]); cm.setValue(t); cm.clearHistory(); }
+    else ta.value = t;
+    shown = { proj: state.cur, tab: state.tab };
+    loading = false;
+  }
+  /* copy what's in the editor back into the project it came from */
+  function syncFromEditor() { var p = shownProject(); if (p && shown.tab && !loading) p[shown.tab] = getText(); }
+  var runSoon = debounce(function () { if (state.auto) run(); }, 700);
+  function onEdit() {
+    if (loading) return;
+    var p = shownProject();
+    if (!p || !shown.tab) return;
+    p[shown.tab] = getText();
+    p.updated = Date.now();
+    clearErrMark();
+    runSoon();
+  }
+  function debounce(fn, ms) { var t = 0; return function () { clearTimeout(t); t = setTimeout(fn, ms); }; }
+
+  function showTab(tab) {
+    syncFromEditor();
+    state.tab = tab;
+    document.querySelectorAll('.ftab').forEach(function (b) { b.classList.toggle('on', b.dataset.f === tab); b.setAttribute('aria-selected', b.dataset.f === tab); });
+    var p = cur();
+    setText(p ? p[tab] : '');
+    if (cm) setTimeout(function () { cm.refresh(); cm.focus(); }, 0);
+  }
+  document.querySelector('.ftabs').addEventListener('click', function (e) { var b = e.target.closest('.ftab'); if (b) showTab(b.dataset.f); });
+
+  /* ---------------- projects ---------------- */
+  function fillProjects() {
+    var sel = $('proj');
+    var list = state.projects.slice().sort(function (a, b) { return b.updated - a.updated; });
+    sel.innerHTML = list.map(function (p) { return '<option value="' + p.id + '">' + esc(p.name) + '</option>'; }).join('') + '<option value="__del">Delete this project…</option>';
+    sel.value = state.cur;
+    $('name').value = (cur() || {}).name || '';
+  }
+  $('proj').addEventListener('change', async function () {
+    if (this.value === '__del') {
+      this.value = state.cur;
+      var p = cur();
+      if (!(await ask('Delete "' + p.name + '"?', 'This project is gone for good. (A game you saved from it stays in Game System.)', 'Delete'))) return;
+      state.projects = state.projects.filter(function (x) { return x !== p; });
+      if (!state.projects.length) state.projects.push(fromExample(EX[EX.length - 1]));
+      openProject(state.projects[0].id);
+      return;
+    }
+    openProject(this.value);
+  });
+  function openProject(id) {
+    syncFromEditor();
+    state.cur = id;
+    var p = cur();
+    fillProjects();
+    var c = p && p.cursor;
+    showTab(c && c.tab ? c.tab : 'html');
+    if (cm && c && c.tab === state.tab) cm.setCursor({ line: c.line || 0, ch: c.ch || 0 });
+    clearConsole();
+    run();
+  }
+  $('name').addEventListener('input', function () { var p = cur(); if (p) { p.name = this.value.slice(0, 60) || 'My project'; p.updated = Date.now(); } });
+  $('name').addEventListener('change', fillProjects);
+  $('b-new').innerHTML = svg('plus') + '<span class="hide-sm">New</span>';
+  $('b-new').addEventListener('click', function () { var p = fromExample(EX[EX.length - 1]); state.projects.push(p); openProject(p.id); toast('New project'); });
+  $('b-ex').innerHTML = svg('book') + '<span class="hide-sm">Examples</span>';
+  $('b-ex').addEventListener('click', examples);
+  function examples() {
+    var m = modal('Examples and lessons', '<p>Pick one to open it as a new project. Change anything and watch the preview!</p><div class="ex-grid">' + EX.map(function (e) {
+      return '<button class="ex" data-ex="' + e.id + '"><em>' + e.tag + '</em><b>' + esc(e.name) + '</b><span>' + esc(e.desc) + '</span></button>';
+    }).join('') + '</div>', []);
+    m.box.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-ex]');
+      if (!b) return;
+      var ex = EX.find(function (x) { return x.id === b.dataset.ex; });
+      var p = fromExample(ex);
+      state.projects.push(p);
+      m.close();
+      openProject(p.id);
+      showTab(ex.js ? 'js' : (ex.css && !ex.html ? 'css' : 'html'));
+    });
+    setTimeout(function () { var f = m.box.querySelector('.ex'); if (f) f.focus(); }, 30);
+  }
+
+  /* ---------------- running it ---------------- */
+  var BRIDGE = '<script>(function(){function s(l,a){try{parent.postMessage({gs2code:1,level:l,text:Array.prototype.map.call(a,function(x){if(typeof x==="string")return x;try{return JSON.stringify(x)}catch(e){return String(x)}}).join(" ")},"*")}catch(e){}}' +
+    '["log","info","warn","error"].forEach(function(l){var o=console[l];console[l]=function(){s(l,arguments);return o.apply(console,arguments)}});' +
+    'addEventListener("error",function(e){parent.postMessage({gs2code:1,level:"error",text:e.message||"Error",line:e.lineno||0},"*")});' +
+    'addEventListener("unhandledrejection",function(e){s("error",["Promise failed: "+(e.reason&&e.reason.message||e.reason)])});})();<\/script>';
+  /* one page from the three tabs. jsLine = the line where the JS starts (to turn error lines into JS-tab lines) */
+  function compose(p, preview) {
+    var css = p.css.trim() ? '<style>\n' + p.css + '\n</style>\n' : '';
+    var jsOpen = '<script>\n';
+    var js = p.js.trim() ? jsOpen + p.js.replace(/<\/script/gi, '<\\/script') + '\n<\/script>\n' : '';
+    var head = '<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>' + esc(p.name) + '</title>\n' + (preview ? BRIDGE + '\n' : '') + css;
+    var out, html = p.html;
+    if (/<html[\s>]/i.test(html) || /<body[\s>]/i.test(html)) {
+      out = html;
+      out = /<\/head>/i.test(out) ? out.replace(/<\/head>/i, head + '</head>') : out.replace(/<body([^>]*)>/i, '<head>\n' + head + '</head>\n<body$1>');
+      out = /<\/body>/i.test(out) ? out.replace(/<\/body>(?![\s\S]*<\/body>)/i, js + '</body>') : out + '\n' + js;
+      if (!/^\s*<!doctype/i.test(out)) out = '<!DOCTYPE html>\n' + out;
+    } else {
+      out = '<!DOCTYPE html>\n<html lang="en">\n<head>\n' + head + '</head>\n<body>\n' + html + '\n' + js + '</body>\n</html>\n';
+    }
+    var idx = js ? out.indexOf(jsOpen + p.js.slice(0, 40)) : -1;
+    var jsLine = idx >= 0 ? out.slice(0, idx).split('\n').length + 1 : 0;
+    return { html: out, jsLine: jsLine };
+  }
+  var frame = null, lastJsLine = 0;
+  function run() {
+    syncFromEditor();
+    var p = cur();
+    if (!p) return;
+    var c = compose(p, true);
+    lastJsLine = c.jsLine;
+    var box = $('preview');
+    if (frame) frame.remove();
+    frame = document.createElement('iframe');
+    frame.title = 'Preview';
+    frame.setAttribute('sandbox', 'allow-scripts allow-modals allow-pointer-lock allow-popups');
+    frame.srcdoc = c.html;
+    box.appendChild(frame);
+    clearConsole(true);
+    var dot = $('live-dot');
+    dot.style.opacity = '.3';
+    setTimeout(function () { dot.style.opacity = ''; }, 200);
+    return false;
+  }
+  $('b-run').innerHTML = svg('play');
+  $('b-run').addEventListener('click', run);
+  $('auto').checked = state.auto;
+  $('auto').addEventListener('change', function () { state.auto = this.checked; if (state.auto) run(); });
+
+  /* ---------------- console ---------------- */
+  var errs = 0;
+  window.addEventListener('message', function (e) {
+    if (!frame || e.source !== frame.contentWindow || !e.data || !e.data.gs2code) return;
+    var d = e.data;
+    var level = ['log', 'info', 'warn', 'error'].indexOf(d.level) >= 0 ? d.level : 'log';
+    var line = 0;
+    if (d.line && lastJsLine && d.line >= lastJsLine) line = d.line - lastJsLine + 1;
+    addRow(level, String(d.text || '').slice(0, 4000), line);
+  });
+  function addRow(level, text, line) {
+    var log = $('clog');
+    var empty = log.querySelector('.empty-c');
+    if (empty) empty.remove();
+    if (log.children.length > 300) log.firstChild.remove();
+    var row = document.createElement('div');
+    row.className = 'row ' + level;
+    row.textContent = text;
+    if (line) {
+      var ln = document.createElement('span');
+      ln.className = 'ln';
+      ln.textContent = 'JS line ' + line;
+      ln.onclick = function () { jumpTo(line); };
+      row.prepend(ln);
+    }
+    log.appendChild(row);
+    log.scrollTop = log.scrollHeight;
+    if (level === 'error') {
+      errs++;
+      $('cn').hidden = false; $('cn').textContent = errs;
+      if (line) markErr(line);
+      document.querySelector('.ftab[data-f="js"]').innerHTML = 'JS<span class="err"></span>';
+    }
+  }
+  function clearConsole(keepClosed) {
+    errs = 0;
+    $('cn').hidden = true;
+    $('clog').innerHTML = '<div class="empty-c">Messages from console.log() and errors show up here.</div>';
+    document.querySelector('.ftab[data-f="js"]').textContent = 'JS';
+    if (!keepClosed) clearErrMark();
+  }
+  var errMark = null;
+  function markErr(line) {
+    if (!cm || state.tab !== 'js') return;
+    clearErrMark();
+    errMark = cm.addLineClass(line - 1, 'background', 'err-line');
+  }
+  function clearErrMark() { if (cm && errMark) { cm.removeLineClass(errMark, 'background', 'err-line'); errMark = null; } }
+  function jumpTo(line) {
+    if (state.view === 'preview') setView('code');
+    showTab('js');
+    if (cm) { cm.setCursor({ line: line - 1, ch: 0 }); cm.scrollIntoView(null, 80); markErr(line); cm.focus(); }
+  }
+  $('b-clear').innerHTML = svg('clear');
+  $('b-clear').addEventListener('click', function (e) { e.stopPropagation(); clearConsole(); });
+  $('chead').addEventListener('click', function () { state.consoleOpen = !state.consoleOpen; $('console').classList.toggle('closed', !state.consoleOpen); });
+  $('console').classList.toggle('closed', !state.consoleOpen);
+
+  /* ---------------- save as a game / app, download, ask an AI ---------------- */
+  $('b-save').innerHTML = svg('save') + '<span>Save as…</span>';
+  $('b-save').addEventListener('click', saveDialog);
+  function saveDialog() {
+    syncFromEditor();
+    var p = cur();
+    if (!p) return false;
+    if (!GS || !GS.create) { toast('Open Code inside Game System to save it as a game'); return false; }
+    var upd = !!p.gameId;
+    var m = modal(upd ? 'Update your ' + p.kind : 'Save it in Game System',
+      '<p>' + (upd ? 'You saved this project before. Update it with your new code, or save a new copy.' : 'Your project becomes a real game or app in Game System, with its own picture, saves and everything.') + '</p>' +
+      '<input class="txt" id="save-name" maxlength="60" value="' + esc(p.name) + '" aria-label="Name">', [
+        upd ? { label: 'Update it', primary: true, run: function (name) { return doSave(p, name, p.kind, true); } } : null,
+        { label: 'Save as game', primary: !upd, run: function (name) { return doSave(p, name, 'game', false); } },
+        { label: 'Save as app', run: function (name) { return doSave(p, name, 'app', false); } }
+      ]);
+    setTimeout(function () { var i = m.box.querySelector('#save-name'); if (i) { i.focus(); i.select(); } }, 30);
+    return false;
+  }
+  async function doSave(p, name, kind, update) {
+    name = String(name || p.name || 'My game').trim().slice(0, 60) || 'My game';
+    try {
+      var r = await GS.create({ name: name, html: compose(p, false).html, kind: kind, id: update ? p.gameId : null });
+      p.gameId = r.id; p.kind = r.kind; p.name = name;
+      fillProjects();
+      toast(update ? 'Updated "' + name + '"!' : 'Saved! "' + name + '" is in your ' + (kind === 'app' ? 'Apps' : 'Library') + ' now.');
+    } catch (e) { toast('Couldn\'t save: ' + (e.message || e)); }
+  }
+  $('b-dl').innerHTML = svg('down');
+  $('b-dl').addEventListener('click', function () {
+    syncFromEditor();
+    var p = cur();
+    var blob = new Blob([compose(p, false).html], { type: 'text/html' });
+    var u = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = u; a.download = (p.name || 'project').replace(/[\\/:*?"<>|]+/g, '-') + '.html';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(u); }, 4000);
+    toast('Downloaded');
+  });
+  $('b-ai').innerHTML = svg('spark') + '<span class="hide-sm">Ask AI</span>';
+  $('b-ai').addEventListener('click', function () {
+    syncFromEditor();
+    var p = cur();
+    var m = modal('Ask an AI about your code', '<p>Type your question. Your code gets copied with it, so you can paste it into any AI chat (like Claude). Then paste the answer back here.</p>' +
+      '<input class="txt" id="ai-q" maxlength="300" placeholder="Like: make the player jump, or why is nothing moving?">', [
+        { label: 'Copy for AI', primary: true, run: function () {
+          var q = (m.box.querySelector('#ai-q').value || 'Can you check my code and make it better?').trim();
+          var errors = Array.prototype.map.call(document.querySelectorAll('#clog .row.error'), function (r) { return r.textContent; }).slice(0, 10);
+          var text = 'I\'m making a small web project in a live HTML/CSS/JS editor (three parts). ' + q + '\n\n' +
+            (errors.length ? 'Errors I see:\n' + errors.join('\n') + '\n\n' : '') +
+            '--- HTML ---\n' + p.html + '\n\n--- CSS ---\n' + p.css + '\n\n--- JS ---\n' + p.js + '\n\n' +
+            'Please answer with the full new code for each part that changes (HTML, CSS and/or JS), with no "rest of the code" placeholders.';
+          return copy(text).then(function (ok) { toast(ok ? 'Copied! Paste it into an AI chat.' : 'Couldn\'t copy. Select and copy it yourself.'); });
+        } }
+      ]);
+  });
+  function copy(t) {
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t).then(function () { return true; }, function () { return fallbackCopy(t); });
+    return Promise.resolve(fallbackCopy(t));
+  }
+  function fallbackCopy(t) {
+    var x = document.createElement('textarea');
+    x.value = t; document.body.appendChild(x); x.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    x.remove();
+    return ok;
+  }
+
+  /* ---------------- phone: code or preview ---------------- */
+  function setView(v) { state.view = v; $('app').dataset.v = v; document.querySelectorAll('.views .btn').forEach(function (b) { b.classList.toggle('on', b.dataset.v === v); }); if (v === 'code' && cm) setTimeout(function () { cm.refresh(); }, 0); }
+  document.querySelector('.views').addEventListener('click', function (e) { var b = e.target.closest('[data-v]'); if (b) setView(b.dataset.v); });
+
+  /* ---------------- small boxes ---------------- */
+  function modal(title, bodyHtml, actions) {
+    var back = document.createElement('div');
+    back.className = 'modal-back';
+    back.innerHTML = '<div class="modal" role="dialog" aria-label="' + esc(title) + '"><header><h2>' + esc(title) + '</h2><button class="icon" data-close aria-label="Close">' + svg('x') + '</button></header><div class="mbody">' + bodyHtml + '</div>' +
+      (actions && actions.filter(Boolean).length ? '<div class="acts">' + actions.filter(Boolean).map(function (a, i) { return '<button class="btn' + (a.primary ? ' primary' : '') + '" data-act="' + i + '">' + esc(a.label) + '</button>'; }).join('') + '</div>' : '') + '</div>';
+    document.body.appendChild(back);
+    var acts = (actions || []).filter(Boolean);
+    var m = { box: back, close: function () { back.remove(); document.removeEventListener('keydown', key, true); if (cm) cm.focus(); } };
+    function key(e) { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); m.close(); } }
+    document.addEventListener('keydown', key, true);
+    back.addEventListener('click', function (e) {
+      if (e.target === back || e.target.closest('[data-close]')) { m.close(); return; }
+      var b = e.target.closest('[data-act]');
+      if (!b) return;
+      var input = back.querySelector('input.txt');
+      var r = acts[Number(b.dataset.act)].run(input ? input.value : '');
+      Promise.resolve(r).then(function (v) { if (v !== false) m.close(); });
+    });
+    return m;
+  }
+  function ask(title, text, ok) {
+    return new Promise(function (resolve) {
+      var done = false;
+      var m = modal(title, '<p>' + esc(text) + '</p>', [{ label: 'Cancel', run: function () { done = true; resolve(false); } }, { label: ok, primary: true, run: function () { done = true; resolve(true); } }]);
+      var obs = new MutationObserver(function () { if (!m.box.isConnected) { obs.disconnect(); if (!done) resolve(false); } });
+      obs.observe(document.body, { childList: true });
+    });
+  }
+  var toastT = 0;
+  function toast(msg) { var t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(function () { t.classList.remove('show'); }, 2800); }
+
+  window.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); run(); }
+    else if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) { e.preventDefault(); saveDialog(); }
+  });
+
+  /* ---------------- go ---------------- */
+  makeEditor();
+  fillProjects();
+  setView(state.view);
+  var c0 = (cur() || {}).cursor;
+  showTab(c0 && c0.tab ? c0.tab : state.tab);
+  if (cm && c0 && c0.tab === state.tab) cm.setCursor({ line: c0.line || 0, ch: c0.ch || 0 });
+  run();
+})();
+</script>
+</body>
+</html>
