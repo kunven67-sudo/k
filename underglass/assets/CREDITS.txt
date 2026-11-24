@@ -1,0 +1,11 @@
+UNDERGLASS - credits for the real stuff inside
+
+Item, tree, furniture and plant pictures: photographed from free 3D models by Poly Haven (polyhaven.com), CC0.
+Wall, floor, roof and ground textures: Poly Haven, CC0.
+Sky photos: Poly Haven HDRIs (kloofendal_48d_partly_cloudy_puresky, qwantani_sunrise_puresky, qwantani_dusk_2_puresky, qwantani_night_puresky), CC0.
+Space photos: ESA/Hubble & NASA (heic0611b, heic0506a, heic1509a), Creative Commons Attribution 4.0.
+Sound effects: freesound.org, all CC0 (list in sounds/CREDITS.txt and sounds/CREDITS-underglass.txt).
+Windows-style system icons (used only when the Segoe Fluent Icons font is missing): Microsoft Fluent UI System Icons, MIT License.
+Physics: Rapier (dimforge), Apache License 2.0.
+Fonts: Barlow + Barlow Condensed, SIL Open Font License.
+On Windows the fake desktop shows your own wallpaper, icons, cursor and Windows sounds. They are read from your PC and never changed or sent anywhere.

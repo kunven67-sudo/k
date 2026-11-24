@@ -1,0 +1,51 @@
+name: UNDERGLASS Windows check
+on:
+  push:
+    branches: [error544/peaceful-johnson-5vj5fr]
+    paths: ['underglass/**', '.github/workflows/underglass-windows.yml', '!underglass/tests/win-results/**']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: underglass
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install
+        run: |
+          $env:ELECTRON_SKIP_BINARY_DOWNLOAD = "1"
+          npm ci --no-audit --no-fund
+          Invoke-WebRequest https://github.com/electron/electron/releases/download/v44.6.0/electron-v44.6.0-win32-x64.zip -OutFile electron-win.zip
+      - name: Build the app folder
+        run: node tools/pack.js electron-win.zip dist
+      - name: Run the game on a real Windows screen
+        run: |
+          New-Item -ItemType Directory -Force tests/win-results | Out-Null
+          $env:UG_TEST = "$PWD\tests\wintest.js"; $env:UG_OUT = "$PWD\tests\win-results"; $env:UG_DATA = "$env:APPDATA\underglass"
+          $p = Start-Process -FilePath "dist\UNDERGLASS\UNDERGLASS.exe" -PassThru
+          Wait-Process -Id $p.Id -Timeout 300
+          Get-Content tests/win-results/results.json
+      - name: Zip the game
+        run: Compress-Archive -Path "dist\UNDERGLASS" -DestinationPath "dist\UNDERGLASS.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: UNDERGLASS-windows
+          path: underglass/dist/UNDERGLASS.zip
+          retention-days: 7
+      - name: Save results to the branch
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f tests/win-results
+          git commit -m "UNDERGLASS Windows check results" 2>$null
+          git pull --rebase origin error544/peaceful-johnson-5vj5fr
+          git push origin HEAD:error544/peaceful-johnson-5vj5fr

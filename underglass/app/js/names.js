@@ -1,0 +1,7 @@
+// made-up people need names
+import { pick } from './util.js';
+const M = 'Liam Noah Oliver Elijah James Lucas Mason Ethan Logan Jacob Leo Owen Caleb Ryan Nathan Isaac Aaron Carter Dylan Miles Jonah Felix Hugo Theo Marcus Andre Rafael Mateo Diego Omar Malik Jalen Tyrell Darius Kenji Hiro Arjun Ravi Samir Yusuf Ivan Nikolai Tomas Lars Sven Emil Otto Bruno Victor Simon Adrian Julian Xavier Wesley Grant Reid Cole Derek Shane Troy Wade Quinn Rhys Ezra Silas Abel Jude Nico Rocco Enzo Luca Marco Dante Cyrus Tariq Kofi Kwame Juan Pablo Andres Benji Toby Max'.split(' ');
+const F = 'Olivia Emma Ava Sophia Mia Isabella Amelia Harper Ella Luna Chloe Zoe Nora Lily Grace Hazel Aria Layla Ruby Ivy Stella Violet Maya Nina Leah Sara Tara Jade Rosa Elena Lucia Sofia Camila Valeria Ines Freya Astrid Ingrid Hanna Elsa Yuki Aiko Mei Priya Anika Leila Amira Zara Nadia Imani Aaliyah Keisha Tiana Brielle Paige Quinn Skye Wren Iris Daisy Faith Hope Joy Eden Sage Tessa Gemma Clara Vera Lena Mila Kira Noor Dalia Fatima Rania Ayla'.split(' ');
+const LAST = 'Carter Reyes Novak Haldane Okafor Lindqvist Moreau Tanaka Vasquez Brennan Kowalski Mbeki Sato Hughes Petrov Larsen Delgado Abara Whitlock Ferreira Kaplan Osei Marlow Quint Ashby Rowe Vance Hale Stroud Pike Ferro Draper Ellery Tamsin Castell Orr Wilde Nakamura Achebe Duarte Holm Varga Iyer Cho Brandt'.split(' ');
+export const firstName = (sex) => pick(sex === 'f' ? F : sex === 'm' ? M : Math.random() < 0.5 ? M : F);
+export const lastName = () => pick(LAST);

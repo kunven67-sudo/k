@@ -1,0 +1,59 @@
+<!doctype html><html><body style="margin:0;background:transparent">
+<script type="importmap">{"imports":{"three":"../../node_modules/three/build/three.module.js","three/addons/":"../../node_modules/three/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+const { ipcRenderer } = require('electron');
+const cfg = await ipcRenderer.invoke('cfg');
+const log = (m) => ipcRenderer.send('log', m);
+const R = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 1.0; R.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene();
+const pm = new THREE.PMREMGenerator(R);
+const hdr = await new RGBELoader().loadAsync('file://' + cfg.hdr);
+scene.environment = pm.fromEquirectangular(hdr).texture; scene.environmentIntensity = 0.75;
+const sun = new THREE.DirectionalLight(0xfff4e6, 2.2); sun.position.set(-3, 5, 4); scene.add(sun);
+const meta = {};
+function hull(pts) { pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]); const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [], up = []; for (const p of pts) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+  for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
+  up.pop(); lo.pop(); return lo.concat(up); }
+function simplify(h, n) { h = h.slice(); const area = (a, b, c) => Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]));
+  while (h.length > n) { let bi = 0, bv = 1e18; for (let i = 0; i < h.length; i++) { const v = area(h[(i - 1 + h.length) % h.length], h[i], h[(i + 1) % h.length]); if (v < bv) { bv = v; bi = i; } } h.splice(bi, 1); } return h; }
+for (const job of cfg.jobs) {
+  try {
+    const g = await new GLTFLoader().loadAsync('file://' + cfg.modelsDir + '/' + job.id + '/model.gltf');
+    let obj = g.scene;
+    if (job.pick !== undefined) { let root = obj; while (root.children.length === 1 && root.children[0].children.length > 1) root = root.children[0];
+      const kids = root.children.filter(k => { let m = false; k.traverse(o => { if (o.isMesh) m = true; }); return m; });
+      let keep = kids[0];
+      if (job.pick === 'largest' || job.pick === 'tallest') { let bv = -1; for (const k of kids) { const sz = new THREE.Box3().setFromObject(k).getSize(new THREE.Vector3()); const v = job.pick === 'tallest' ? sz.y : sz.x * sz.y * sz.z; if (v > bv) { bv = v; keep = k; } } }
+      else keep = kids[Math.min(kids.length - 1, job.pick)] || keep;
+      for (const k of kids) if (k !== keep) k.visible = false; log(job.out + ' kids ' + kids.length);
+      for (const k of kids) if (k !== keep) root.remove(k); }
+    obj.rotation.set(job.pitch || 0, job.yaw ?? 0.3, job.roll || 0);
+    obj.traverse(o => { if (o.isMesh) { o.castShadow = false; if (o.material) o.material.side = THREE.DoubleSide; } });
+    scene.add(obj); obj.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(obj), size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
+    const px = job.px || 512, wm = size.x, hm = size.y, s = px / Math.max(wm, hm);
+    const W = Math.max(8, Math.round(wm * s)), H = Math.max(8, Math.round(hm * s));
+    R.setSize(W, H, false);
+    const cam = new THREE.OrthographicCamera(-wm / 2, wm / 2, hm / 2, -hm / 2, 0.01, 1000);
+    cam.position.set(c.x, c.y, c.z + size.z + 10); cam.lookAt(c.x, c.y, c.z);
+    R.setClearColor(0, 0); R.render(scene, cam);
+    // alpha hull for physics
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const cx = cv.getContext('2d'); cx.drawImage(R.domElement, 0, 0);
+    const d = cx.getImageData(0, 0, W, H).data, pts = [];
+    for (let y = 0; y < H; y++) { let l = -1, r = -1; for (let x = 0; x < W; x++) if (d[(y * W + x) * 4 + 3] > 60) { if (l < 0) l = x; r = x; } if (l >= 0) { pts.push([l / W, y / H], [(r + 1) / W, y / H]); } }
+    const h = simplify(hull(pts), 10).map(p => [+p[0].toFixed(3), +p[1].toFixed(3)]);
+    const b64 = cv.toDataURL('image/png').split(',')[1];
+    ipcRenderer.send('save', job.out + '.png', b64);
+    meta[job.out] = { w: +wm.toFixed(3), h: +hm.toFixed(3), hull: h };
+    scene.remove(obj);
+    log(job.out + ' ' + wm.toFixed(2) + 'x' + hm.toFixed(2) + 'm ' + W + 'x' + H);
+  } catch (e) { log('FAIL ' + job.id + ' ' + e.message); }
+}
+ipcRenderer.send('save', 'sprites.json', btoa(JSON.stringify(meta, null, 0)));
+ipcRenderer.send('done');
+</script></body></html>
